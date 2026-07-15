@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新聞閱讀</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top-bar">
+  <a class="back-link" href="sources.html?type=NEWS">‹ 返回來源選擇</a>
+  <h1 id="page-title">新聞</h1>
+</header>
+<main>
+  <div id="layout" class="news-layout">
+    <div class="news-list-pane">
+      <div id="list-area"><p class="loading-msg">載入中...</p></div>
+      <div class="pager-row">
+        <button id="prev-btn" disabled>‹ 上一頁</button>
+        <button id="next-btn" disabled>下一頁 ›</button>
+      </div>
+    </div>
+    <div class="news-content-pane">
+      <button class="mobile-back-btn" id="back-btn">‹ 返回列表</button>
+      <div id="content-area"><p class="loading-msg">請從左側選擇一篇文章</p></div>
+    </div>
+  </div>
+</main>
+<script>
+const params = new URLSearchParams(location.search);
+const sourceTitle = params.get('title') || '新聞';
+let currentListUrl = params.get('url');
+document.getElementById('page-title').textContent = sourceTitle;
+
+const layout = document.getElementById('layout');
+const listArea = document.getElementById('list-area');
+const contentArea = document.getElementById('content-area');
+const prevBtn = document.getElementById('prev-btn');
+const nextBtn = document.getElementById('next-btn');
+const backBtn = document.getElementById('back-btn');
+
+let nextPageUrl = null;
+let prevPageUrl = null;
+
+async function loadList(listUrl) {
+  currentListUrl = listUrl;
+  listArea.innerHTML = '<p class="loading-msg">載入中...</p>';
+  prevBtn.disabled = true;
+  nextBtn.disabled = true;
+  try {
+    const res = await fetch(`/api/news/list?url=${encodeURIComponent(listUrl)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '未知錯誤');
+    if (!data.articles.length) {
+      listArea.innerHTML = '<p class="empty-msg">此頁沒有找到文章</p>';
+    } else {
+      listArea.innerHTML = '<ul>' + data.articles.map((a) =>
+        `<li><a href="#" data-url="${encodeURIComponent(a.url)}">${a.title}</a></li>`
+      ).join('') + '</ul>';
+    }
+    nextPageUrl = data.nextPageUrl;
+    prevPageUrl = data.prevPageUrl;
+    prevBtn.disabled = !prevPageUrl;
+    nextBtn.disabled = !nextPageUrl;
+
+    listArea.querySelectorAll('a[data-url]').forEach((a) => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        listArea.querySelectorAll('a[data-url]').forEach((el) => el.classList.remove('active'));
+        a.classList.add('active');
+        loadArticle(decodeURIComponent(a.dataset.url));
+      });
+    });
+  } catch (err) {
+    listArea.innerHTML = `<div class="error-box">列表載入失敗：${err.message}<br><button onclick="loadList('${listUrl}')">重新嘗試</button></div>`;
+  }
+}
+
+async function loadArticle(articleUrl) {
+  contentArea.innerHTML = '<p class="loading-msg">載入中...</p>';
+  layout.classList.add('show-content');
+  try {
+    const res = await fetch(`/api/news/article?url=${encodeURIComponent(articleUrl)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '未知錯誤');
+    contentArea.innerHTML = `<div class="article-title">${data.title}</div><div class="article-content">${data.contentHtml}</div>`;
+  } catch (err) {
+    contentArea.innerHTML = `<div class="error-box">內文載入失敗：${err.message}<br><button onclick="loadArticle('${articleUrl}')">重新嘗試</button></div>`;
+  }
+}
+
+prevBtn.addEventListener('click', () => { if (prevPageUrl) loadList(prevPageUrl); });
+nextBtn.addEventListener('click', () => { if (nextPageUrl) loadList(nextPageUrl); });
+backBtn.addEventListener('click', () => { layout.classList.remove('show-content'); });
+
+loadList(currentListUrl);
+</script>
+</body>
+</html>

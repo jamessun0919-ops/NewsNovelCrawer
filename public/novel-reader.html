@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>閱讀中</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top-bar">
+  <a class="back-link" id="back-to-list" href="#">‹ 返回章節列表</a>
+  <h1 id="page-title">閱讀中</h1>
+</header>
+<main>
+  <div class="reader-nav">
+    <button id="prev-btn" disabled>‹ 上一章</button>
+    <button id="next-btn" disabled>下一章 ›</button>
+  </div>
+  <div id="content-area" class="reader-content"><p class="loading-msg">載入中...</p></div>
+  <div class="reader-nav">
+    <button id="prev-btn-bottom" disabled>‹ 上一章</button>
+    <button id="next-btn-bottom" disabled>下一章 ›</button>
+  </div>
+</main>
+<script>
+const params = new URLSearchParams(location.search);
+const novelUrl = params.get('novelUrl');
+const novelTitle = params.get('novelTitle') || '小說';
+let chapterUrl = params.get('url');
+let chapterNumber = params.get('chapterNumber') ? parseInt(params.get('chapterNumber'), 10) : null;
+
+document.getElementById('page-title').textContent = novelTitle;
+document.getElementById('back-to-list').href = `novel-list.html?url=${encodeURIComponent(novelUrl)}&title=${encodeURIComponent(novelTitle)}`;
+
+const contentArea = document.getElementById('content-area');
+const prevBtns = [document.getElementById('prev-btn'), document.getElementById('prev-btn-bottom')];
+const nextBtns = [document.getElementById('next-btn'), document.getElementById('next-btn-bottom')];
+
+function saveProgress(title) {
+  if (!novelUrl) return;
+  localStorage.setItem(`novel-progress-${novelUrl}`, JSON.stringify({
+    chapterUrl, chapterTitle: title, chapterNumber,
+  }));
+}
+
+async function loadChapter(url, num) {
+  chapterUrl = url;
+  chapterNumber = num || null;
+  contentArea.innerHTML = '<p class="loading-msg">載入中...</p>';
+  prevBtns.forEach((b) => b.disabled = true);
+  nextBtns.forEach((b) => b.disabled = true);
+
+  const qs = new URLSearchParams({ url: chapterUrl, novelUrl, novelTitle });
+  if (chapterNumber) qs.set('chapterNumber', chapterNumber);
+  history.pushState(null, '', `novel-reader.html?${qs.toString()}`);
+
+  try {
+    const res = await fetch(`/api/novel/chapter?url=${encodeURIComponent(chapterUrl)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '未知錯誤');
+    contentArea.innerHTML = `<div class="article-title">${data.title}</div>${data.contentHtml}`;
+    document.getElementById('page-title').textContent = data.title;
+    saveProgress(data.title);
+
+    prevBtns.forEach((b) => {
+      b.disabled = !data.prevUrl;
+      b.onclick = () => data.prevUrl && loadChapter(data.prevUrl, chapterNumber ? chapterNumber - 1 : null);
+    });
+    nextBtns.forEach((b) => {
+      b.disabled = !data.nextUrl;
+      b.onclick = () => data.nextUrl && loadChapter(data.nextUrl, chapterNumber ? chapterNumber + 1 : null);
+    });
+    window.scrollTo(0, 0);
+  } catch (err) {
+    contentArea.innerHTML = `<div class="error-box">章節載入失敗：${err.message}<br><button onclick="loadChapter('${chapterUrl}', ${chapterNumber || 'null'})">重新嘗試</button></div>`;
+  }
+}
+
+loadChapter(chapterUrl, chapterNumber);
+</script>
+</body>
+</html>

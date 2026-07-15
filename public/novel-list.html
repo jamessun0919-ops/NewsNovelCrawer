@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>章節列表</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top-bar">
+  <a class="back-link" href="sources.html?type=Novel">‹ 返回小說選擇</a>
+  <h1 id="page-title">章節列表</h1>
+</header>
+<main>
+  <div id="resume-area"></div>
+  <div class="jump-box">
+    <span>跳到第</span>
+    <input type="number" id="jump-input" min="1" placeholder="章數">
+    <span>章</span>
+    <button id="jump-btn">跳轉</button>
+  </div>
+  <div id="list-area"><p class="loading-msg">載入中...</p></div>
+  <div id="pagination-area" class="pagination-bar"></div>
+</main>
+<script>
+const PAGE_SIZE = 50;
+const params = new URLSearchParams(location.search);
+const novelUrl = params.get('url');
+const novelTitle = params.get('title') || '小說';
+document.getElementById('page-title').textContent = novelTitle;
+
+const listArea = document.getElementById('list-area');
+const paginationArea = document.getElementById('pagination-area');
+const resumeArea = document.getElementById('resume-area');
+
+function progressKey() { return `novel-progress-${novelUrl}`; }
+
+function showResume() {
+  const raw = localStorage.getItem(progressKey());
+  if (!raw) return;
+  try {
+    const p = JSON.parse(raw);
+    resumeArea.innerHTML = `<div class="resume-box"><span>上次讀到：${p.chapterTitle}</span>
+      <a class="resume-btn" href="novel-reader.html?url=${encodeURIComponent(p.chapterUrl)}&novelUrl=${encodeURIComponent(novelUrl)}&novelTitle=${encodeURIComponent(novelTitle)}&chapterNumber=${p.chapterNumber}">繼續閱讀</a></div>`;
+  } catch (e) { /* ignore malformed progress */ }
+}
+
+function renderPagination(page, totalPages) {
+  const buttons = [];
+  const addBtn = (label, targetPage, disabled, current) => {
+    buttons.push(`<button data-page="${targetPage}" ${disabled ? 'disabled' : ''} class="${current ? 'current' : ''}">${label}</button>`);
+  };
+  addBtn('‹', page - 1, page <= 1, false);
+  const start = Math.max(1, page - 2);
+  const end = Math.min(totalPages, page + 2);
+  if (start > 1) addBtn('1', 1, false, false);
+  if (start > 2) buttons.push('<span>...</span>');
+  for (let p = start; p <= end; p++) addBtn(String(p), p, false, p === page);
+  if (end < totalPages - 1) buttons.push('<span>...</span>');
+  if (end < totalPages) addBtn(String(totalPages), totalPages, false, false);
+  addBtn('›', page + 1, page >= totalPages, false);
+
+  paginationArea.innerHTML = buttons.join('');
+  paginationArea.querySelectorAll('button[data-page]').forEach((btn) => {
+    btn.addEventListener('click', () => loadPage(parseInt(btn.dataset.page, 10)));
+  });
+}
+
+async function loadPage(page) {
+  listArea.innerHTML = '<p class="loading-msg">載入中...</p>';
+  try {
+    const res = await fetch(`/api/novel/chapters?url=${encodeURIComponent(novelUrl)}&page=${page}&pageSize=${PAGE_SIZE}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '未知錯誤');
+    listArea.innerHTML = '<ul class="chapter-list">' + data.chapters.map((c) =>
+      `<li><a href="novel-reader.html?url=${encodeURIComponent(c.url)}&novelUrl=${encodeURIComponent(novelUrl)}&novelTitle=${encodeURIComponent(novelTitle)}&chapterNumber=${c.chapterNumber}">${c.title}</a></li>`
+    ).join('') + '</ul>';
+    renderPagination(data.page, data.totalPages);
+  } catch (err) {
+    listArea.innerHTML = `<div class="error-box">章節目錄載入失敗：${err.message}<br><button onclick="loadPage(${page})">重新嘗試</button></div>`;
+  }
+}
+
+document.getElementById('jump-btn').addEventListener('click', () => {
+  const n = parseInt(document.getElementById('jump-input').value, 10);
+  if (!n || n < 1) return;
+  loadPage(Math.ceil(n / PAGE_SIZE));
+});
+
+showResume();
+loadPage(1);
+</script>
+</body>
+</html>

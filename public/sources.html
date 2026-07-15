@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>選擇來源</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top-bar">
+  <a class="back-link" href="index.html">‹ 返回</a>
+  <h1 id="page-title">選擇來源</h1>
+</header>
+<main>
+  <div id="list" class="source-list"></div>
+</main>
+<script>
+const params = new URLSearchParams(location.search);
+const type = params.get('type') || 'NEWS';
+const isNovel = type === 'Novel';
+document.getElementById('page-title').textContent = isNovel ? '選擇小說' : '選擇新聞來源';
+
+async function load() {
+  const listEl = document.getElementById('list');
+  listEl.innerHTML = '<p class="loading-msg">載入中...</p>';
+  try {
+    const res = await fetch(`/api/sources?type=${encodeURIComponent(type)}`);
+    const sources = await res.json();
+    if (!sources.length) {
+      listEl.innerHTML = '<p class="empty-msg">target.txt 中尚無此類型的來源</p>';
+      return;
+    }
+    const targetPage = isNovel ? 'novel-list.html' : 'news.html';
+    listEl.innerHTML = sources.map((s) =>
+      `<a class="source-item" href="${targetPage}?url=${encodeURIComponent(s.url)}&title=${encodeURIComponent(s.title)}">${s.title}</a>`
+    ).join('');
+  } catch (err) {
+    listEl.innerHTML = `<div class="error-box">來源清單載入失敗：${err.message}<br><button onclick="load()">重新嘗試</button></div>`;
+  }
+}
+load();
+</script>
+</body>
+</html>
