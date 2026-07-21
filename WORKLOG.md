@@ -41,6 +41,15 @@
 - 推送圖示修正與字體預設值調整，並提醒使用者：如果先前已加入過主畫面的舊版（破圖）捷徑，手機會快取當時圖示，需要先移除舊捷徑再重新加入才會看到修正後圖示
 - 使用者反映找不到「加入主畫面」按鈕，誤以為是網站內的功能；澄清這是瀏覽器原生功能（iOS走Safari分享選單、Android走Chrome選單/自動安裝提示），我們做的manifest與圖示只負責讓瀏覽器偵測到「可安裝」，並說明如果要在網頁內加自訂引導按鈕，Android可用`beforeinstallprompt`事件、iOS Safari沒有對應API做不到真正按鈕
 - 使用者結束本階段工作，請求完成交接文件後推送並關閉；確認無本機測試server在執行，更新HANDOVER/WORKLOG/CHATLOG/README後推送
+- 使用者詢問 tw.hjwzw.com 爬蟲時用了哪種驗證機制：實測（不同UA組合逐一curl測試）確認是nginx層的UA名單檢查（空UA/curl UA會403，python-requests預設UA跟瀏覽器UA都能通過），非Cloudflare等級防護，`server.js`現有的一般fetch+瀏覽器UA做法已足夠
+- 使用者請求整理四個網站（含新聞technews.tw）的防護等級與反爬對策，先實測technews.tw確認完全無防護（空UA/curl UA/瀏覽器UA皆200，只掛CloudFront CDN），整理成表格：
+
+| 網站 | 防護等級 | 防護機制 | 採取的反爬操作 |
+|---|---|---|---|
+| technews.tw（新聞） | 無 | 無任何驗證，只掛CloudFront CDN | 不需要，一般fetch即可 |
+| tw.hjwzw.com（黃金屋） | 低 | nginx層UA名單檢查（擋空UA、curl等已知工具字串，其餘皆放行） | 一般fetch + 瀏覽器UA字串即可通過 |
+| czbooks.net（小說狂人） | 中高 | Cloudflare機器人防護，本機端用TLS指紋辨識擋Node fetch但curl可過；雲端機房IP則用IP信譽判斷一律擋下，回傳JS人機驗證頁 | 本機：改用系統curl子行程（`fetchHtmlViaCurl`）已落地；雲端：僅提出三個方案建議（headless瀏覽器/付費proxy/雲端版不提供），使用者選擇暫不處理，未實際執行 |
+| www.quanben.io（全本小說，已放棄） | 高 | 章節目錄僅靜態顯示前後各24章，中間章節需呼叫帶自訂加密簽章的JSONP API | 曾嘗試逆向重現簽章邏輯但失敗（回傳參數錯誤），因另兩個來源已完整涵蓋同一本小說，與使用者確認後放棄，未真正繞過 |
 
 ## 2026-07-15
 - 完成 NEWScrawer 專案整體架構討論（尚未寫程式碼）
