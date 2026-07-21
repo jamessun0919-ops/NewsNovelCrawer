@@ -147,6 +147,8 @@ app.get('/api/novel/chapters', async (req, res) => {
     if (!chapters) {
       const html = await fetchHtmlViaCurl(url);
       chapters = czbooks.parseChapterList(html);
+      console.log(`[debug] czbooks html length=${html.length}, chapters found=${chapters.length}`);
+      console.log(`[debug] czbooks html snippet: ${html.slice(0, 300)}`);
       chapterListCache.set(url, chapters);
     }
     const totalChapters = chapters.length;
