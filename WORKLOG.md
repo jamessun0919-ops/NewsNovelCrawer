@@ -35,6 +35,12 @@
   - `server.js`新增`/manifest.json`、`/icons/*`兩個不需登入的例外路由（比照style.css的處理方式），因為瀏覽器判斷能否安裝時會在使用者尚未登入、停留在登入頁時就讀取這些檔案，若被`requireAuth`擋住會偵測不到可安裝
   - 這個session沒有瀏覽器自動化工具，僅能透過curl驗證路由回應與程式碼檢查，請使用者自行本機/Render上實測UI效果
 - 使用者確認測試完成，請求推送
+- 使用者回報：字體大小功能正確，但要求預設字體大小改22px（原17px）；PWA圖示沒看到，詢問「加入主畫面」按鈕在哪個頁面
+- 排查圖示問題：檢查PNG的IHDR color type，發現初版圖示帶alpha色版（color type 6），這是iOS Safari的apple-touch-icon常見的破圖/空白顯示成因；修改`generate-icons.ps1`明確指定`Format24bppRgb`（無alpha色版）重新產生三個圖示並驗證color type改為2
+- 調整`novel-reader.html`的`DEFAULT_FONT_SIZE`常數為22px
+- 推送圖示修正與字體預設值調整，並提醒使用者：如果先前已加入過主畫面的舊版（破圖）捷徑，手機會快取當時圖示，需要先移除舊捷徑再重新加入才會看到修正後圖示
+- 使用者反映找不到「加入主畫面」按鈕，誤以為是網站內的功能；澄清這是瀏覽器原生功能（iOS走Safari分享選單、Android走Chrome選單/自動安裝提示），我們做的manifest與圖示只負責讓瀏覽器偵測到「可安裝」，並說明如果要在網頁內加自訂引導按鈕，Android可用`beforeinstallprompt`事件、iOS Safari沒有對應API做不到真正按鈕
+- 使用者結束本階段工作，請求完成交接文件後推送並關閉；確認無本機測試server在執行，更新HANDOVER/WORKLOG/CHATLOG/README後推送
 
 ## 2026-07-15
 - 完成 NEWScrawer 專案整體架構討論（尚未寫程式碼）

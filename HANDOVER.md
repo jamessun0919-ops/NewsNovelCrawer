@@ -19,16 +19,17 @@
 - **評估後放棄新增 `www.quanben.io`（全本小說）來源**：該站章節目錄頁的 HTML 只直接放出前24章與後24章，中間章節需呼叫帶自訂加密簽章參數的 JSONP API 才能取得（刻意的反爬蟲設計），逆向工程該簽章邏輯後仍回傳「參數錯誤」；考量到 target.txt 裡這三個小說來源其實是同一本小說（絕頂唐門），czbooks.net 與 hjwzw.com 已能完整涵蓋，經與使用者確認後決定放棄此來源，已從 target.txt 移除
 - **`server.js` 已改為依來源網址自動選擇對應 parser**（`getNovelSite` 函式，依 hostname 判斷），不再寫死呼叫 czbooks，novel 相關的兩支 API 路由（`/api/novel/chapters`、`/api/novel/chapter`）都已改用這個機制
 - 使用者已在 Render 上實測確認 `tw.hjwzw.com` 章節列表與內文都能正確讀取；`czbooks.net` 使用者已在 target.txt 該筆標題加註「反爬未處理」，明確表示**暫不處理**，非本輪待辦
-- **小說閱讀頁新增字體大小調整功能**：`novel-reader.html` 新增 A-/A+ 按鈕（14px～28px，每次±2px），設定存 LocalStorage（key: `novel-reader-font-size`），跳章不會重置；本機已檢查程式邏輯與既有風格一致，但**這個 session 沒有瀏覽器自動化工具，未做過實際畫面截圖驗證**，待使用者本機確認
+- **小說閱讀頁字體大小調整功能已完成並經使用者確認**：`novel-reader.html` 新增 A-/A+ 按鈕（14px～28px，每次±2px），設定存 LocalStorage（key: `novel-reader-font-size`），跳章不會重置；預設字體大小依使用者要求從17px調整為22px（已有儲存設定的使用者不受影響，只影響未設定過的初次使用情境）
 - **PWA「加入主畫面」基礎建設已完成**（僅此功能，不含離線快取/推播，使用者明確表示範圍只要這個）：
   - `public/manifest.json`：name/short_name「文章閱讀器」、`start_url: "/"`、`display: standalone`、theme_color `#2f6feb`（比照網站既有主色）
   - 圖示：`public/icons/icon-192.png`、`icon-512.png`、`apple-touch-icon.png`，用 PowerShell + .NET `System.Drawing` 產生（環境內沒有 ImageMagick 等圖片工具，改用 `scripts/generate-icons.ps1` 這支一次性腳本畫「閱」字白字+品牌藍底），如需重新產生圖示可重跑這支腳本
   - `server.js` 新增 `/manifest.json`、`/icons/*` 兩個**不需登入**即可存取的路由（比照 `login.html`／`style.css` 的例外處理）——因為瀏覽器判斷「可否加入主畫面」時，會在使用者尚未登入、還停留在 `/login.html` 的當下就去抓 manifest 與圖示，這兩者若被 `requireAuth` 擋住，安裝功能會偵測不到
   - 6 個前端頁面的 `<head>` 都補上 `<link rel="manifest">`、`theme-color`、`apple-touch-icon` 與 `apple-mobile-web-app-*` 系列 meta tag（iOS Safari 不吃 web manifest，需要這組 meta tag 才能「加入主畫面」時有正確圖示與全螢幕模式）
-  - 這部分也尚未經瀏覽器實測（無自動化工具），待使用者在手機瀏覽器上實際「加入主畫面」驗證圖示與啟動效果
+  - **修正過圖示破圖問題**：初版圖示是帶 alpha（透明）色版的 PNG（.NET Bitmap 預設格式 Format32bppArgb），iOS Safari 對有透明色版的 apple-touch-icon 常顯示異常；已改用 `Format24bppRgb`（無透明色版）重新產生三個圖示，色版格式已用程式驗證（PNG IHDR color type從6改為2）
+  - 使用者詢問「加入主畫面」按鈕在哪個頁面，已澄清：這不是網站自己畫的 UI，是瀏覽器原生功能（iOS Safari走分享選單、Android Chrome走三點選單或自動安裝提示），manifest/圖示只是讓瀏覽器「偵測到可安裝」，本次未額外做網頁內的引導按鈕或`beforeinstallprompt`自訂安裝流程
 
 ## 目前的瓶頸或停頓點 (Current Blocker/Status)
-字體調整功能與 PWA 加入主畫面功能都已寫完並通過程式碼層級檢查，但**都還沒經過使用者實機測試、也還沒推送**（這個 session 沒有瀏覽器自動化工具可用，無法自行截圖驗證 UI）。等使用者確認兩項功能實際運作正常，再一起推送。
+本輪工作到此告一段落，所有異動都已推送。**字體調整功能使用者已實機確認正常**；**PWA部分使用者尚未回報最終確認**（圖示alpha色版問題修正後的版本剛推送，尚待使用者下次在手機上實際「加入主畫面」驗證圖示與啟動效果是否正常），下次接續時應優先確認這點。
 
 czbooks.net 在 Render 上的 Cloudflare 阻擋問題，使用者已表態暫不處理（target.txt 已加註），非目前待辦，但解法選項還是先記錄著，之後有需要可以直接接續：
 - A. 在 Render 上加 headless 瀏覽器（如 Puppeteer）自動解 JS 驗證頁——免費但變慢、吃記憶體，免費方案 512MB 可能不夠、得升級付費方案
@@ -37,7 +38,7 @@ czbooks.net 在 Render 上的 Cloudflare 阻擋問題，使用者已表態暫不
 
 ## 下一步行動 (Next Steps)
 1. 下次開始工作時，先檢查 target.txt 是否有新增項目（新的類型/自訂標題/網址）；如有，先與使用者確認是否要建立對應的新 parser，再動工
-2. 請使用者測試字體調整按鈕與「加入主畫面」功能，確認無誤後推送到 GitHub（Render 會自動重新部署）
+2. 確認使用者是否已驗證修正後的 PWA 圖示（手機上重新「加入主畫面」，記得提醒使用者要先移除舊的主畫面捷徑，否則舊圖示會被快取）
 3. 使用者已表示 PWA 下一步可能想加離線閱讀或其他功能，但目前只確認要「加入主畫面」這一項，其餘功能待使用者明確提出後再討論架構（離線快取會牽涉到 Service Worker 如何處理已登入內容的快取邊界，需要先討論清楚再動工，見 CHATLOG）
 4. 本專案後續工作一律推送至 https://github.com/jamessun0919-ops/NewsNovelCrawer
 
@@ -62,3 +63,6 @@ czbooks.net 在 Render 上的 Cloudflare 阻擋問題，使用者已表態暫不
   - 已實測 Render 免費方案的容器環境有內建系統 curl（`fetchHtmlViaCurl` 在 Render 上執行不會噴 command not found），czbooks.net 抓不到內容是 Cloudflare IP 信譽阻擋，不是 curl 缺失問題（詳見上方「目前的瓶頸」）
 - **多來源小說 parser 派發機制**：`server.js` 的 `getNovelSite(url)` 依網址 hostname 決定要用哪個 parser 與哪種 fetch 方式（czbooks.net → `czbooks.js` + `fetchHtmlViaCurl`；hjwzw.com → `hjwzw.js` + 一般 `fetchHtml`，此站沒有 Cloudflare 這類機器人防護，不需要繞過），novel 相關的兩支 API 路由都透過這個函式取得對應 parser，不再寫死；新增小說來源時要在這裡加一個 hostname 判斷分支
 - **`parsers/hjwzw.js` 清洗規則**：章節列表用 `#tbchapterlist a` 選取；章節內文的容器是 `div[style*="text-indent: 2em"]`，但頁面下方另有一個內容相同 inline style 的短 div（「請記住本站域名」廣告字樣），要取 `.first()` 才是真正內文；內文開頭還有兩段站方樣板文字混在正文容器內（一段是純文字＋`<b>`標籤的域名提醒、不包在`<p>`裡；一段是包在第一個`<p>`裡的書名+章節標題重複），需要各自移除，見程式內註解；「上一章」連結在第一章時會指向章節ID為`,0`的死連結（需判斷過濾掉，回傳null），「下一章」連結在最後一章直接不存在`<a>`標籤（純文字「末頁」）
+- **小說閱讀頁字體大小**：`novel-reader.html` 內常數 `DEFAULT_FONT_SIZE`（現為22px）、`MIN_FONT_SIZE`(14)、`MAX_FONT_SIZE`(28)、`FONT_SIZE_STEP`(2)，設定存於 LocalStorage key `novel-reader-font-size`；套用方式是設定`contentArea`（`#content-area`容器本身）的inline style，不是套在innerHTML內容上，所以`loadChapter()`換章節替換innerHTML時不會遺失字體設定，不需要每次換章重新套用
+- **PWA 圖示產生注意事項**：環境沒有ImageMagick等圖片工具，用PowerShell + .NET `System.Drawing`（`scripts/generate-icons.ps1`）產生；.NET Bitmap預設是`Format32bppArgb`（含alpha色版），存成PNG會被iOS Safari的apple-touch-icon顯示異常（破圖/空白），已改用建構子明確指定`Format24bppRgb`（不含alpha色版）；腳本內文字元（中文字「閱」跟中文註解）曾因Windows PowerShell 5.1讀取無BOM的UTF-8檔案編碼誤判導致整份腳本解析失敗，之後把中文字元改用`[char]0x95B1`這類unicode code point寫法、註解全部改英文，才穩定執行——之後如果要修改這支腳本，避免直接在.ps1檔案裡寫中文字元
+- **「加入主畫面」是瀏覽器原生功能，不是網站自畫的按鈕**：manifest.json + 圖示只是讓瀏覽器偵測「這個網站可安裝」，iOS走Safari分享選單、Android走Chrome選單或自動彈出的安裝提示；如果之後要在網頁內加自訂的安裝引導按鈕，Android可監聽`beforeinstallprompt`事件做一鍵安裝，但iOS Safari沒有對應API，只能顯示操作說明文字，無法做成真正的一鍵按鈕
