@@ -1,5 +1,20 @@
 # 工作日誌 (Worklog)
 
+## 2026-07-21
+- 背景：使用者無法提供穩定開機的 server，需部署到雲端才能用手機等裝置存取，因此決定先做帳號密碼機制再考慮部署
+- 動工前先確認方案架構：討論部署平台類型對架構的影響（czbooks.net 依賴系統 curl 子行程繞過 Cloudflare、內文快取存在記憶體中，這兩點在 serverless 平台可能失效），使用者確認方向為「常駐型服務」(Render/Railway/Fly.io)，帳號規模確認為「單一帳號」
+- 確認並實作方案：
+  - 新增套件 express-session、bcryptjs、express-rate-limit、dotenv
+  - 帳密以環境變數存放（AUTH_USERNAME、AUTH_PASSWORD_HASH bcrypt雜湊、SESSION_SECRET），不寫入程式碼或git；建立 `scripts/hash-password.js` 一次性小工具產生密碼雜湊
+  - `.env` 加入 `.gitignore`，建立 `.env.example` 供部署參考欄位
+  - `server.js` 新增 `requireAuth` middleware，擋在所有頁面與 API 路由前；新增 `/api/login`、`/api/logout`；PORT 改讀 `process.env.PORT` 以配合雲端平台
+  - session cookie 設定 `secure: 'auto'` 搭配 `trust proxy`，因應雲端平台在自己的 proxy 終止 TLS 的情境
+  - `/api/login` 加上 express-rate-limit（15分鐘5次），防止暴力破解密碼
+  - 新增 `public/login.html` 登入頁與對應 CSS，樣式比照現有頁面風格；首頁新增「登出」連結
+- 本機測試（curl 逐項驗證，非開瀏覽器）：未登入存取首頁會302導向登入頁、未登入呼叫API回401、密碼錯誤回401、連續失敗5次後觸發429、正確登入後可正常存取頁面與API、登出後再次存取又被擋下，皆正常
+- 測試完成後已關閉本機測試用 server
+- 更新 HANDOVER.md 記錄帳號密碼機制的完整技術細節，待辦事項改為「選定雲端平台並實際部署」
+
 ## 2026-07-15
 - 完成 NEWScrawer 專案整體架構討論（尚未寫程式碼）
 - 確認技術棧：Node.js + Express + Cheerio + 純 HTML/JS 前端

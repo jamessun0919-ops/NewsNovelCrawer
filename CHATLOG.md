@@ -1,5 +1,25 @@
 # 對話紀錄 (Chatlog)
 
+## 2026-07-21
+
+### 開場：確認交接狀態
+- 開發者：請閱讀交接資料與規則後與我討論，開始本階段工作
+- Agent 讀取 HANDOVER.md / WORKLOG.md / CHATLOG.md / README.md 及 target.txt、git 狀態，回報現況（working tree clean，與 origin/main 同步，target.txt 無新增來源），詢問這階段要做什麼，列出四個可能方向（新增來源、修bug、手機存取方案、其他需求）
+
+### 需求提出與方案討論
+- 開發者：我要先建立帳號密碼機制，才能部署到雲端，我無法提供穩定開機的 server
+- Agent 主動指出風險：現有 czbooks.net 爬取依賴系統 curl 子行程繞過 Cloudflare 防護、內文快取存在 Node process 記憶體中，這兩點在 serverless 平台（如 Vercel/Netlify）可能直接失效，因此部署平台類型會決定架構是否要大改
+- Agent 提問（AskUserQuestion）：
+  - 部署平台類型：常駐型服務(Render/Railway/Fly.io，建議) / 自己的VPS / Serverless / 還沒決定先做帳密機制 → 開發者選擇「常駐型服務（建議）」
+  - 帳號規模：單一帳號(建議) / 多組帳號 → 開發者選擇「單一帳號（建議）」
+- Agent 讀取現有 server.js、package.json、public/ 內頁面與 style.css 了解現況與風格後，提出具體方案（套件選擇 express-session/bcryptjs/express-rate-limit/dotenv、帳密存放於環境變數、登入/登出流程、保護範圍涵蓋所有頁面與API、session cookie設定含secure:'auto'搭配trust proxy、rate limit、記憶體session store的取捨說明、PORT改讀環境變數），依專案規則（先確認架構再寫程式碼）詢問是否有要調整
+- 開發者：請實作
+
+### 實作與測試
+- Agent 安裝套件、建立 `scripts/hash-password.js`、設定 `.env`/`.env.example`/`.gitignore`、改寫 `server.js` 加入完整驗證流程、新增 `public/login.html` 與對應CSS、首頁加登出連結
+- 本機用 curl 逐項測試：未登入導向/401、錯誤密碼、rate limit（15分鐘5次後429）、正確登入、登入後可存取、登出後再次被擋，皆驗證通過；測試完成後關閉本機 server
+- Agent 更新 HANDOVER.md（含完整技術細節與下一步：選雲端平台、確認平台是否有系統curl、部署時記得換掉測試用帳密與SESSION_SECRET）、WORKLOG.md
+
 ## 2026-07-15
 
 ### 架構討論（Drill Me 模式）

@@ -1,7 +1,11 @@
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
+const session = require('express-session');
+const bcrypt = require('bcryptjs');
+const rateLimit = require('express-rate-limit');
 const { loadTargets } = require('./targetParser');
 const technews = require('./parsers/technews');
 const czbooks = require('./parsers/czbooks');
@@ -9,7 +13,7 @@ const czbooks = require('./parsers/czbooks');
 const execFileAsync = promisify(execFile);
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
@@ -32,6 +36,71 @@ async function fetchHtmlViaCurl(url) {
   if (!stdout) throw new Error('empty response');
   return stdout;
 }
+
+app.set('trust proxy', 1);
+app.use(express.json());
+
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: 'auto',
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 天
+  },
+}));
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: '登入嘗試次數過多，請 15 分鐘後再試' },
+});
+
+// 登入頁與其樣式表在驗證前即可存取
+app.get('/login.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+app.get('/style.css', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'style.css'));
+});
+
+app.post('/api/login', loginLimiter, async (req, res) => {
+  const { username, password } = req.body || {};
+  if (!username || !password) {
+    return res.status(400).json({ error: '請輸入帳號與密碼' });
+  }
+  const validUsername = username === process.env.AUTH_USERNAME;
+  const validPassword = validUsername
+    ? await bcrypt.compare(password, process.env.AUTH_PASSWORD_HASH)
+    : false;
+  if (!validUsername || !validPassword) {
+    return res.status(401).json({ error: '帳號或密碼錯誤' });
+  }
+  req.session.regenerate((err) => {
+    if (err) return res.status(500).json({ error: '登入失敗，請重試' });
+    req.session.authenticated = true;
+    res.json({ ok: true });
+  });
+});
+
+app.post('/api/logout', (req, res) => {
+  req.session.destroy(() => {
+    res.clearCookie('connect.sid');
+    res.json({ ok: true });
+  });
+});
+
+function requireAuth(req, res, next) {
+  if (req.session && req.session.authenticated) return next();
+  if (req.path.startsWith('/api/')) return res.status(401).json({ error: '未登入' });
+  return res.redirect('/login.html');
+}
+
+app.use(requireAuth);
 
 app.use(express.static(path.join(__dirname, 'public')));
 

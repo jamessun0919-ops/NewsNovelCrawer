@@ -13,17 +13,22 @@
 ```
 target.txt          # 來源設定檔：類型(NEWS/Novel)、自訂標題、網址
 targetParser.js      # 解析 target.txt
-server.js            # Express 伺服器與 API 路由
+server.js            # Express 伺服器、API 路由、帳號密碼驗證
+scripts/
+  hash-password.js     # 一次性工具：產生密碼的 bcrypt hash
 parsers/
   technews.js         # technews.tw 新聞列表/內文解析
   czbooks.js           # czbooks.net 小說章節列表/內文解析
 public/
+  login.html            # 登入頁
   index.html           # 首頁：看新聞／看小說
   sources.html          # 來源選擇（依類型篩選 target.txt）
   news.html              # 新聞：標題列表＋內文左右分欄，RWD 768px 斷點
   novel-list.html         # 小說：章節列表，分頁＋跳章
   novel-reader.html        # 小說：閱讀頁，上一章/下一章，LocalStorage 記錄進度
 ```
+
+啟動前需設定環境變數（複製 `.env.example` 為 `.env` 並填入自己的帳密）：`AUTH_USERNAME`、`AUTH_PASSWORD_HASH`（用 `node scripts/hash-password.js "密碼"` 產生）、`SESSION_SECRET`。
 
 技術棧：Node.js + Express + Cheerio（後端）＋ 純 HTML/JS 前端（無框架）。
 
@@ -40,9 +45,10 @@ public/
 - [x] 錯誤處理：抓取失敗顯示錯誤訊息＋提供重試按鈕
 - [x] czbooks.net 的 Cloudflare 防護繞過（改用系統 curl 子行程）
 - [x] Playwright 桌面／模擬手機雙尺寸完整流程驗證
+- [x] 帳號密碼機制：單一帳號登入（session-based），涵蓋所有頁面與 API，含登入失敗次數限制，為部署到雲端常駐服務做準備
 
 ## 未完成事項
 
 - 目前僅支援 target.txt 中已定義的 technews.tw、czbooks.net 兩個來源；新增其他網站需另外撰寫對應 parser
 - 小說「下一章」目前為即時爬取，未做預爬快取（如需更順暢的翻頁體驗可再評估）
-- 帳號密碼機制：目前無登入驗證，僅限本機或私人網路（區網/Tailscale）使用；若未來要公開部署，需另外設計登入機制
+- 尚未實際部署到雲端平台：需選定 Render/Railway/Fly.io 等常駐型服務，並確認該平台環境有系統 curl 可用（czbooks.net 爬取依賴此）
