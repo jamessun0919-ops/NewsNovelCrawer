@@ -9,6 +9,7 @@ const rateLimit = require('express-rate-limit');
 const { loadTargets } = require('./targetParser');
 const technews = require('./parsers/technews');
 const czbooks = require('./parsers/czbooks');
+const hjwzw = require('./parsers/hjwzw');
 
 const execFileAsync = promisify(execFile);
 
@@ -35,6 +36,15 @@ async function fetchHtmlViaCurl(url) {
   });
   if (!stdout) throw new Error('empty response');
   return stdout;
+}
+
+// Per-site adapter lookup for novel sources: each site has its own HTML
+// structure and its own bot-detection quirks (see fetchHtmlViaCurl above).
+function getNovelSite(url) {
+  const hostname = new URL(url).hostname;
+  if (hostname.endsWith('czbooks.net')) return { parser: czbooks, fetchHtml: fetchHtmlViaCurl };
+  if (hostname.endsWith('hjwzw.com')) return { parser: hjwzw, fetchHtml };
+  throw new Error('不支援的小說來源網站');
 }
 
 app.set('trust proxy', 1);
@@ -145,10 +155,9 @@ app.get('/api/novel/chapters', async (req, res) => {
   try {
     let chapters = chapterListCache.get(url);
     if (!chapters) {
-      const html = await fetchHtmlViaCurl(url);
-      chapters = czbooks.parseChapterList(html);
-      console.log(`[debug] czbooks html length=${html.length}, chapters found=${chapters.length}`);
-      console.log(`[debug] czbooks html snippet: ${html.slice(0, 300)}`);
+      const { parser, fetchHtml: fetchHtmlForSite } = getNovelSite(url);
+      const html = await fetchHtmlForSite(url);
+      chapters = parser.parseChapterList(html);
       chapterListCache.set(url, chapters);
     }
     const totalChapters = chapters.length;
@@ -169,8 +178,9 @@ app.get('/api/novel/chapter', async (req, res) => {
   if (!url) return res.status(400).json({ error: '缺少網址參數' });
   try {
     if (articleCache.has(url)) return res.json(articleCache.get(url));
-    const html = await fetchHtmlViaCurl(url);
-    const chapter = czbooks.parseChapter(html);
+    const { parser, fetchHtml: fetchHtmlForSite } = getNovelSite(url);
+    const html = await fetchHtmlForSite(url);
+    const chapter = parser.parseChapter(html);
     articleCache.set(url, chapter);
     res.json(chapter);
   } catch (err) {

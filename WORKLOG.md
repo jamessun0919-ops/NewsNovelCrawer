@@ -14,6 +14,19 @@
 - 本機測試（curl 逐項驗證，非開瀏覽器）：未登入存取首頁會302導向登入頁、未登入呼叫API回401、密碼錯誤回401、連續失敗5次後觸發429、正確登入後可正常存取頁面與API、登出後再次存取又被擋下，皆正常
 - 測試完成後已關閉本機測試用 server
 - 更新 HANDOVER.md 記錄帳號密碼機制的完整技術細節，待辦事項改為「選定雲端平台並實際部署」
+- 使用者密碼含特殊符號「@」，確認程式無字元限制（純字串比對），協助產生新密碼雜湊並更新本機 `.env`
+- 使用者確認前後端不需分開部署（GitHub Pages 之類），因現有架構已是前後端同服務，拆開反而會破壞同源session保護機制、需額外處理CORS，沒有效益
+- 提供 Render 部署設定流程（Build/Start指令、環境變數清單、免費方案spin down限制對現有記憶體快取/session架構的影響）
+- 使用者實際部署到 Render（https://newsnovelcrawer.onrender.com）後回報：小說章節列表空白（無錯誤訊息）
+- 排查：先自行用curl重新驗證czbooks.net本機仍可正常抓取解析（1468章），排除程式邏輯問題；請使用者提供瀏覽器DevTools Network截圖，確認API回傳200但`chapters:[]`；加入暫時性debug log（印HTML長度與片段）推送重新部署，請使用者重現問題後回報Render Logs內容
+- 從Render Logs確認：czbooks.net回傳的是Cloudflare `Just a moment...` JS人機驗證頁（非TLS指紋問題，是IP信譽層級阻擋，比先前解決的問題更難處理），此問題影響範圍只限czbooks.net（雲端機房IP被歸類為高風險來源），非curl本身失效
+- 提出三個解法方向讓使用者選擇：A.加headless瀏覽器自動解驗證頁（免費但吃資源）B.付費residential proxy（穩定但有月費）C.雲端版只留新聞+其他小說來源，czbooks.net只在本機用；使用者尚未決定，待下次討論
+- 使用者提出要推送修改過的target.txt（新增了 tw.hjwzw.com、www.quanben.io 兩個小說來源，其中一筆czbooks.net標題也有更動）；依專案規則發現新來源沒有對應parser，先詢問使用者要怎麼處理，使用者選擇「先建立parser再一起推送」
+- 查證兩個新網站實際結構：
+  - tw.hjwzw.com：章節目錄單頁列完（1450章），內文容器需濾除頭尾站方樣板文字（域名廣告、書名重複），「上一章」在首章有死連結sentinel(`,0`)需判斷過濾，成功建立parser並通過測試
+  - www.quanben.io：發現該站章節目錄頁只静態顯示前24章與後24章，中間章節藏在需要自訂JS加密簽章才能呼叫的JSONP API後面（刻意反爬蟲），嘗試逆向重現該簽章邏輯但持續回傳「參數錯誤」；因這三個小說來源其實是同一本小說（絕頂唐門），czbooks.net與hjwzw.com已可完整涵蓋，與使用者確認後放棄此來源，從target.txt移除
+- 實作 `server.js` 的 `getNovelSite()` 派發機制，依網址hostname自動選擇對應parser與抓取方式（czbooks.net用curl繞過、hjwzw.com用一般fetch即可），取代原本寫死呼叫czbooks的邏輯；同時移除先前為排查Cloudflare問題加入的暫時性debug log
+- 本機端對端測試czbooks.net與hjwzw.com兩個來源皆正常（含regression確認czbooks.net未被新邏輯影響）
 
 ## 2026-07-15
 - 完成 NEWScrawer 專案整體架構討論（尚未寫程式碼）

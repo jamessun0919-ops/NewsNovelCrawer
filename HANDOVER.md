@@ -13,15 +13,22 @@
 - 已修正新聞內文夾帶廣告內容問題（詳見下方關鍵設定）
 - 已建立 GitHub 遠端倉庫並推送：https://github.com/jamessun0919-ops/NewsNovelCrawer（Public，使用者已確認風險並選擇維持公開）
 - **帳號密碼機制已實作完成**（為了部署到雲端常駐服務，使用者無法自己提供穩定開機的 server）：單一帳號、session-based 登入，涵蓋所有頁面與 API 路由，詳見下方關鍵設定
+- **已實際部署到 Render**（https://newsnovelcrawer.onrender.com ，免費方案）：帳密機制在雲端環境驗證正常
+- **發現並解法 czbooks.net 在 Render 上抓不到小說章節的問題**：Render 的機房 IP 被 Cloudflare 視為「已知雲端/機房來源」，回傳的是 `Just a moment...` JS 人機驗證頁而非真正內容（不是 curl 消失、也不是程式邏輯錯誤，是 IP 信譽層級的阻擋，比先前繞過的 TLS 指紋辨識更難處理）；此問題**尚未真正解決**，見下方「目前的瓶頸」
+- **新增小說來源 `tw.hjwzw.com`（黃金屋）的完整 parser**（`parsers/hjwzw.js`）：章節目錄單頁列完（1450章），本機 Node fetch 即可正常存取（不像 czbooks.net 需要 curl 繞過），已通過本機測試
+- **評估後放棄新增 `www.quanben.io`（全本小說）來源**：該站章節目錄頁的 HTML 只直接放出前24章與後24章，中間章節需呼叫帶自訂加密簽章參數的 JSONP API 才能取得（刻意的反爬蟲設計），逆向工程該簽章邏輯後仍回傳「參數錯誤」；考量到 target.txt 裡這三個小說來源其實是同一本小說（絕頂唐門），czbooks.net 與 hjwzw.com 已能完整涵蓋，經與使用者確認後決定放棄此來源，已從 target.txt 移除
+- **`server.js` 已改為依來源網址自動選擇對應 parser**（`getNovelSite` 函式，依 hostname 判斷），不再寫死呼叫 czbooks，novel 相關的兩支 API 路由（`/api/novel/chapters`、`/api/novel/chapter`）都已改用這個機制
 
 ## 目前的瓶頸或停頓點 (Current Blocker/Status)
-帳號密碼機制已完成並通過本機測試（登入、錯誤密碼、rate limit、登出、未登入導向皆驗證正常），尚未實際部署到雲端平台。下一步是選定並設定雲端平台（Render/Railway/Fly.io 三選一，使用者已確認方向是「常駐型服務」，尚未選定確切平台）。
+**czbooks.net 在 Render 部署環境下仍無法正常抓取**，因為 Cloudflare 對 Render 機房 IP 一律回傳 JS 驗證頁。目前 `czbooks.net` 這個來源在雲端版是壞的（本機開發環境不受影響，正常運作）；`tw.hjwzw.com` 沒有這個問題，雲端版可正常使用。三個解法選項尚待使用者決定方向（見上一輪對話）：
+- A. 在 Render 上加 headless 瀏覽器（如 Puppeteer）自動解 JS 驗證頁——免費但變慢、吃記憶體，免費方案 512MB 可能不夠、得升級付費方案
+- B. 付費 residential proxy 服務轉發 czbooks.net 的請求——簡單可靠但有持續性月費
+- C. 雲端版只提供新聞 + hjwzw.com 小說，czbooks.net 只在本機用——不用額外花錢，但雲端版看不到 czbooks.net 這個來源
 
 ## 下一步行動 (Next Steps)
 1. 下次開始工作時，先檢查 target.txt 是否有新增項目（新的類型/自訂標題/網址）；如有，先與使用者確認是否要建立對應的新 parser，再動工
-2. 協助使用者選定雲端平台並完成實際部署設定（環境變數：`AUTH_USERNAME`、`AUTH_PASSWORD_HASH`、`SESSION_SECRET`、`PORT`），部署前提醒使用者：本機 `.env` 內是測試用帳密（admin / test1234），正式環境務必換成自己的帳密與新的 `SESSION_SECRET`
-3. 確認雲端平台是否有系統 curl 可用（czbooks.net 爬取依賴 `fetchHtmlViaCurl`），若無則需另外處理
-4. 本專案後續工作一律推送至 https://github.com/jamessun0919-ops/NewsNovelCrawer
+2. 與使用者確認 czbooks.net 在 Render 上抓不到內容的解法方向（上述 A/B/C 三選一），再動工實作
+3. 本專案後續工作一律推送至 https://github.com/jamessun0919-ops/NewsNovelCrawer
 
 ## 關鍵設定與上下文 (Key Context & Rules)
 - **技術棧**：Node.js + Express + Cheerio（後端）＋ 純 HTML/JS 前端（不用框架）
@@ -36,9 +43,11 @@
 - **技術新聞內文清洗規則**：`parsers/technews.js`的`parseArticle`會裁掉「延伸閱讀」區塊（`.extended-reading-section`）及其後內容，並移除所有標記`style="display:none"`的元素（咖啡贊助彈窗、AI Q&A小工具等）——這些在原網站靠CSS/JS預設隱藏，只抓靜態HTML會變成直接顯示，此規則之後若technews.tw改版導致廣告又跑出來，可比照此模式排查
 - **帳號密碼機制**（為部署到雲端常駐服務而建立，單一帳號、非多使用者系統）：
   - 套件：`express-session`（session 管理）、`bcryptjs`（密碼雜湊，純JS版本免雲端編譯原生模組）、`express-rate-limit`（登入防暴力破解）、`dotenv`（本機讀取 `.env`）
-  - 帳密存放：不寫在程式碼或 git 中，透過環境變數 `AUTH_USERNAME`、`AUTH_PASSWORD_HASH`（bcrypt hash，非明文）設定；產生 hash 用 `node scripts/hash-password.js "密碼"`，本機 `.env`（已加入 `.gitignore`）存的是測試用帳密 admin/test1234，僅供本機開發測試，正式環境部署時要在雲端平台自己的環境變數設定換成使用者自己的帳密與獨立的 `SESSION_SECRET`
+  - 帳密存放：不寫在程式碼或 git 中，透過環境變數 `AUTH_USERNAME`、`AUTH_PASSWORD_HASH`（bcrypt hash，非明文）設定；產生 hash 用 `node scripts/hash-password.js "密碼"`，本機 `.env`（已加入 `.gitignore`）與 Render 上的環境變數目前都已換成使用者自己設定的帳號 `admin` 與密碼（非測試用的 test1234），`SESSION_SECRET` 本機與雲端各自獨立設定
   - 保護範圍：`server.js` 中 `requireAuth` middleware 擋在 `express.static` 與所有 `/api/*` 路由之前，未登入存取頁面會 302 導向 `/login.html`，未登入呼叫 API 會回 401 JSON；只有 `GET /login.html`、`GET /style.css`、`POST /api/login`、`POST /api/logout` 這四個路由不需要登入即可存取
   - Session：cookie 設定 `httpOnly`、`secure: 'auto'`（搭配 `app.set('trust proxy', 1)`，讓 express-session 自動依連線是否為 https 判斷，雲端平台在自己的 proxy 終止 TLS 時仍能正確運作）、`sameSite: 'lax'，有效期限 7 天；session store 用 express-session 預設的記憶體儲存（in-memory），這是刻意的取捨——單一使用者、少量 session 不需要額外引入 Redis，缺點是 server 重啟後所有登入狀態會清空，需重新登入，使用者已知悉此取捨
   - Rate limit：`/api/login` 15分鐘內最多5次請求（成功與失敗皆計入次數），超過回 429
   - 登出：首頁右上角「登出」連結（`public/index.html`），呼叫 `POST /api/logout` 銷毀 session 後導回登入頁；其餘頁面目前未放登出按鈕（可從首頁返回登出，未來如需要可再加到每頁 header）
-  - 部署前置條件：czbooks.net 爬取依賴系統 `curl` 子行程（見上方「czbooks.net 爬取須知」），選擇雲端平台時務必確認該平台的容器/執行環境有內建或可安裝 curl，否則小說功能會失效
+  - 已實測 Render 免費方案的容器環境有內建系統 curl（`fetchHtmlViaCurl` 在 Render 上執行不會噴 command not found），czbooks.net 抓不到內容是 Cloudflare IP 信譽阻擋，不是 curl 缺失問題（詳見上方「目前的瓶頸」）
+- **多來源小說 parser 派發機制**：`server.js` 的 `getNovelSite(url)` 依網址 hostname 決定要用哪個 parser 與哪種 fetch 方式（czbooks.net → `czbooks.js` + `fetchHtmlViaCurl`；hjwzw.com → `hjwzw.js` + 一般 `fetchHtml`，此站沒有 Cloudflare 這類機器人防護，不需要繞過），novel 相關的兩支 API 路由都透過這個函式取得對應 parser，不再寫死；新增小說來源時要在這裡加一個 hostname 判斷分支
+- **`parsers/hjwzw.js` 清洗規則**：章節列表用 `#tbchapterlist a` 選取；章節內文的容器是 `div[style*="text-indent: 2em"]`，但頁面下方另有一個內容相同 inline style 的短 div（「請記住本站域名」廣告字樣），要取 `.first()` 才是真正內文；內文開頭還有兩段站方樣板文字混在正文容器內（一段是純文字＋`<b>`標籤的域名提醒、不包在`<p>`裡；一段是包在第一個`<p>`裡的書名+章節標題重複），需要各自移除，見程式內註解；「上一章」連結在第一章時會指向章節ID為`,0`的死連結（需判斷過濾掉，回傳null），「下一章」連結在最後一章直接不存在`<a>`標籤（純文字「末頁」）
