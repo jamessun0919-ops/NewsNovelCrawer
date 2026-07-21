@@ -5,7 +5,9 @@ Add-Type -AssemblyName System.Drawing
 function New-Icon {
     param([int]$Size, [string]$OutPath)
 
-    $bmp = New-Object System.Drawing.Bitmap($Size, $Size)
+    # Format24bppRgb (no alpha channel): apple-touch-icon in particular renders
+    # broken/blank on iOS Safari when the PNG carries an alpha channel.
+    $bmp = New-Object System.Drawing.Bitmap($Size, $Size, [System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
     $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAlias
