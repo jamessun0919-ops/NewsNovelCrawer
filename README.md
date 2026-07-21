@@ -18,17 +18,20 @@ targetParser.js      # 解析 target.txt
 server.js            # Express 伺服器、API 路由、帳號密碼驗證
 scripts/
   hash-password.js     # 一次性工具：產生密碼的 bcrypt hash
+  generate-icons.ps1    # 一次性工具：產生 PWA 圖示
 parsers/
   technews.js         # technews.tw 新聞列表/內文解析
   czbooks.js           # czbooks.net 小說章節列表/內文解析
   hjwzw.js              # tw.hjwzw.com 小說章節列表/內文解析
 public/
+  manifest.json          # PWA manifest（加入主畫面）
+  icons/                  # PWA 圖示（192/512/apple-touch-icon）
   login.html            # 登入頁
   index.html           # 首頁：看新聞／看小說
   sources.html          # 來源選擇（依類型篩選 target.txt）
   news.html              # 新聞：標題列表＋內文左右分欄，RWD 768px 斷點
   novel-list.html         # 小說：章節列表，分頁＋跳章
-  novel-reader.html        # 小說：閱讀頁，上一章/下一章，LocalStorage 記錄進度
+  novel-reader.html        # 小說：閱讀頁，上一章/下一章，LocalStorage 記錄進度，字體大小調整
 ```
 
 啟動前需設定環境變數（複製 `.env.example` 為 `.env` 並填入自己的帳密）：`AUTH_USERNAME`、`AUTH_PASSWORD_HASH`（用 `node scripts/hash-password.js "密碼"` 產生）、`SESSION_SECRET`。
@@ -50,10 +53,13 @@ public/
 - [x] Playwright 桌面／模擬手機雙尺寸完整流程驗證
 - [x] 帳號密碼機制：單一帳號登入（session-based），涵蓋所有頁面與 API，含登入失敗次數限制，為部署到雲端常駐服務做準備
 - [x] 部署到 Render（常駐型服務，免費方案）
-- [x] 新增小說來源 tw.hjwzw.com，`server.js` 依來源網址自動派發對應 parser
+- [x] 新增小說來源 tw.hjwzw.com，`server.js` 依來源網址自動派發對應 parser（使用者已在 Render 上實測正常）
+- [x] 小說閱讀頁字體大小調整（A-/A+ 按鈕，LocalStorage 記憶設定）
+- [x] PWA「加入主畫面」：manifest.json、圖示、iOS 專用 meta tag
 
 ## 未完成事項
 
-- **czbooks.net 在 Render 雲端環境無法正常抓取**：Cloudflare 將 Render 的機房 IP 判定為高風險來源，一律回傳 JS 人機驗證頁而非真正內容（本機環境不受影響，正常運作）。待評估解法：(A) 加 headless 瀏覽器自動解驗證頁、(B) 改用付費 residential proxy、(C) 雲端版不提供此來源
+- **czbooks.net 在 Render 雲端環境無法正常抓取**：Cloudflare 將 Render 的機房 IP 判定為高風險來源，一律回傳 JS 人機驗證頁而非真正內容（本機環境不受影響，正常運作）。使用者已表示暫不處理。待評估解法：(A) 加 headless 瀏覽器自動解驗證頁、(B) 改用付費 residential proxy、(C) 雲端版不提供此來源
 - 目前僅支援 target.txt 中已定義的 technews.tw、czbooks.net、tw.hjwzw.com 三個來源；新增其他網站需另外撰寫對應 parser（已評估過 www.quanben.io，因其章節目錄需要繞過自訂反爬蟲簽章機制，複雜度與效益不成比例，故未支援）
 - 小說「下一章」目前為即時爬取，未做預爬快取（如需更順暢的翻頁體驗可再評估）
+- PWA 目前僅支援加入主畫面，離線閱讀、更新推播等功能尚未討論架構，待使用者提出需求後再評估

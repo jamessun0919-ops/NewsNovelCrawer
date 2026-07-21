@@ -41,6 +41,16 @@
 - Agent查證兩站結構：tw.hjwzw.com章節目錄單頁列完可正常解析(1450章)；www.quanben.io章節目錄頁只静態顯示前後各24章，中間章節藏在需要自訂JS加密簽章才能呼叫的JSONP API後面，Agent嘗試逆向重現簽章邏輯但持續失敗，鑑於三個小說來源其實是同一本小說、另兩個來源已可完整涵蓋，主動提出「放棄quanben.io」等三個選項供開發者選擇 → 開發者選擇建議選項「放棄quanben.io，從target.txt移除」
 - Agent建立`parsers/hjwzw.js`（處理站方樣板文字清洗、首章死連結sentinel判斷等細節）、將`server.js`小說相關路由改為依網址hostname自動派發對應parser(`getNovelSite`函式)、移除先前的除錯log，本機測試czbooks.net與hjwzw.com皆正常後更新HANDOVER/WORKLOG
 
+### 字體調整與PWA討論
+- 開發者：新的目標網站可以正確讀取章節與內文，我在target備註czbook這個網站暫不處理；請幫我在閱讀內文的頁面，新增調整字體大小的功能及按鈕；先完成字體調整功能，後續我計畫增加PWA功能，請與我討論
+- Agent確認target.txt現況（開發者已自行加註czbooks「反爬未處理」），實作字體調整功能：`novel-reader.html`新增A-/A+按鈕，14~28px範圍，LocalStorage記憶設定
+- Agent說明這個session沒有瀏覽器自動化工具，無法實際截圖驗證UI，只能靠程式邏輯檢查與跟既有程式碼風格比對，請開發者自行測試
+- 針對PWA，Agent沒有直接開始實作，先詢問開發者的優先順序（1.加入主畫面 2.離線閱讀 3.推播通知），並說明各自的複雜度與代價（尤其離線閱讀牽涉到登入驗證與Service Worker快取邊界的設計問題）
+- 開發者：只需要加到手機主畫面，像原生App一樣開啟
+- Agent確認環境內沒有ImageMagick等圖片工具，改用PowerShell + .NET System.Drawing寫腳本產生圖示（藍底白色「閱」字），過程中PowerShell腳本內嵌中文字元一度導致解析錯誤，改用unicode code point寫法解決；建立manifest.json、三種尺寸圖示、`server.js`新增manifest與圖示的免登入例外路由（避免安裝偵測被requireAuth擋住）、6個頁面補上對應meta tag
+- Agent展示產生的圖示圖片給開發者看，同樣說明沒有瀏覽器工具驗證UI，請開發者本機或直接部署到Render上實測字體調整按鈕與加入主畫面效果，測試通過再推送
+- 開發者：請推送
+
 ## 2026-07-15
 
 ### 架構討論（Drill Me 模式）

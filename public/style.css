@@ -410,3 +410,28 @@ main {
   padding: 24px;
   font-size: 17px;
 }
+
+.font-size-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #52606d;
+}
+
+.font-size-control button {
+  padding: 6px 14px;
+  border: 1px solid #d3d9e0;
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.font-size-control #font-size-display {
+  min-width: 40px;
+  text-align: center;
+}

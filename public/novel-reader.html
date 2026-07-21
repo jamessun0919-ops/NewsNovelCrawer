@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>閱讀中</title>
 <link rel="stylesheet" href="style.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#2f6feb">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="文章閱讀器">
 </head>
 <body>
 <header class="top-bar">
@@ -15,6 +21,12 @@
   <div class="reader-nav">
     <button id="prev-btn" disabled>‹ 上一章</button>
     <button id="next-btn" disabled>下一章 ›</button>
+  </div>
+  <div class="font-size-control">
+    <span>字體大小</span>
+    <button id="font-decrease">A-</button>
+    <span id="font-size-display"></span>
+    <button id="font-increase">A+</button>
   </div>
   <div id="content-area" class="reader-content"><p class="loading-msg">載入中...</p></div>
   <div class="reader-nav">
@@ -35,6 +47,31 @@ document.getElementById('back-to-list').href = `novel-list.html?url=${encodeURIC
 const contentArea = document.getElementById('content-area');
 const prevBtns = [document.getElementById('prev-btn'), document.getElementById('prev-btn-bottom')];
 const nextBtns = [document.getElementById('next-btn'), document.getElementById('next-btn-bottom')];
+
+const FONT_SIZE_KEY = 'novel-reader-font-size';
+const MIN_FONT_SIZE = 14;
+const MAX_FONT_SIZE = 28;
+const DEFAULT_FONT_SIZE = 17;
+const FONT_SIZE_STEP = 2;
+
+function applyFontSize(size) {
+  contentArea.style.fontSize = `${size}px`;
+  document.getElementById('font-size-display').textContent = `${size}px`;
+  localStorage.setItem(FONT_SIZE_KEY, size);
+}
+
+let fontSize = parseInt(localStorage.getItem(FONT_SIZE_KEY), 10);
+if (!Number.isFinite(fontSize)) fontSize = DEFAULT_FONT_SIZE;
+applyFontSize(fontSize);
+
+document.getElementById('font-decrease').addEventListener('click', () => {
+  fontSize = Math.max(MIN_FONT_SIZE, fontSize - FONT_SIZE_STEP);
+  applyFontSize(fontSize);
+});
+document.getElementById('font-increase').addEventListener('click', () => {
+  fontSize = Math.min(MAX_FONT_SIZE, fontSize + FONT_SIZE_STEP);
+  applyFontSize(fontSize);
+});
 
 function saveProgress(title) {
   if (!novelUrl) return;

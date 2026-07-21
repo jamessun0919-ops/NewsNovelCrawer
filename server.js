@@ -77,6 +77,12 @@ app.get('/login.html', (req, res) => {
 app.get('/style.css', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'style.css'));
 });
+// PWA installability requires the manifest and icons to be fetchable
+// before login (the browser evaluates them on /login.html too).
+app.get('/manifest.json', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'manifest.json'));
+});
+app.use('/icons', express.static(path.join(__dirname, 'public', 'icons')));
 
 app.post('/api/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body || {};

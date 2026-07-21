@@ -27,6 +27,14 @@
   - www.quanben.io：發現該站章節目錄頁只静態顯示前24章與後24章，中間章節藏在需要自訂JS加密簽章才能呼叫的JSONP API後面（刻意反爬蟲），嘗試逆向重現該簽章邏輯但持續回傳「參數錯誤」；因這三個小說來源其實是同一本小說（絕頂唐門），czbooks.net與hjwzw.com已可完整涵蓋，與使用者確認後放棄此來源，從target.txt移除
 - 實作 `server.js` 的 `getNovelSite()` 派發機制，依網址hostname自動選擇對應parser與抓取方式（czbooks.net用curl繞過、hjwzw.com用一般fetch即可），取代原本寫死呼叫czbooks的邏輯；同時移除先前為排查Cloudflare問題加入的暫時性debug log
 - 本機端對端測試czbooks.net與hjwzw.com兩個來源皆正常（含regression確認czbooks.net未被新邏輯影響）
+- 使用者實測確認 tw.hjwzw.com 在 Render 雲端環境章節列表與內文都正常；czbooks.net 使用者已在target.txt標題加註「反爬未處理」，明確表示暫不處理
+- 新增小說閱讀頁字體調整功能：`novel-reader.html` 新增 A-/A+ 按鈕，14px~28px範圍每次±2px，設定存LocalStorage（key: novel-reader-font-size），跳章不重置
+- 新增 PWA「加入主畫面」基礎建設（使用者明確表示這階段只要這個功能，離線快取/推播另外討論）：
+  - 環境內沒有ImageMagick等圖片工具，改用PowerShell + .NET System.Drawing寫一次性腳本`scripts/generate-icons.ps1`產生App圖示（藍底白色「閱」字，色系比照網站主色#2f6feb），中途PowerShell腳本內嵌中文字元導致解析錯誤（Windows PowerShell 5.1讀取無BOM的UTF-8檔案編碼問題），改用`[char]0x95B1`code point寫法解決
+  - 建立`public/manifest.json`（standalone顯示模式、start_url根目錄）與三種尺寸圖示；6個前端頁面`<head>`都補上manifest連結與iOS專用的`apple-mobile-web-app-*` meta tag（iOS Safari不支援標準web manifest）
+  - `server.js`新增`/manifest.json`、`/icons/*`兩個不需登入的例外路由（比照style.css的處理方式），因為瀏覽器判斷能否安裝時會在使用者尚未登入、停留在登入頁時就讀取這些檔案，若被`requireAuth`擋住會偵測不到可安裝
+  - 這個session沒有瀏覽器自動化工具，僅能透過curl驗證路由回應與程式碼檢查，請使用者自行本機/Render上實測UI效果
+- 使用者確認測試完成，請求推送
 
 ## 2026-07-15
 - 完成 NEWScrawer 專案整體架構討論（尚未寫程式碼）
