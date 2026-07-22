@@ -11,9 +11,9 @@ const { loadTargets } = require('./targetParser');
 const technews = require('./parsers/technews');
 const czbooks = require('./parsers/czbooks');
 const hjwzw = require('./parsers/hjwzw');
-const xbanxia = require('./parsers/xbanxia');
 const angelibrary = require('./parsers/angelibrary');
 const bxg123 = require('./parsers/bxg123');
+const shuku52 = require('./parsers/52shuku');
 
 const execFileAsync = promisify(execFile);
 
@@ -27,13 +27,7 @@ const chapterListCache = new Map(); // novelUrl -> [{ title, url }]
 
 async function fetchHtml(url) {
   const res = await fetch(url, { headers: { 'User-Agent': UA } });
-  if (!res.ok) {
-    const body = await res.text();
-    console.log(`[debug] fetchHtml non-ok status=${res.status} url=${url}`);
-    console.log(`[debug] fetchHtml response headers: ${JSON.stringify([...res.headers.entries()])}`);
-    console.log(`[debug] fetchHtml body snippet: ${body.slice(0, 300)}`);
-    throw new Error(`HTTP ${res.status}`);
-  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.text();
 }
 
@@ -71,9 +65,9 @@ function getNovelSite(url) {
   const hostname = new URL(url).hostname;
   if (hostname.endsWith('czbooks.net')) return { parser: czbooks, fetchHtml: fetchHtmlViaCurl };
   if (hostname.endsWith('hjwzw.com')) return { parser: hjwzw, fetchHtml };
-  if (hostname.endsWith('xbanxia.cc')) return { parser: xbanxia, fetchHtml };
   if (hostname.endsWith('angelibrary.com')) return { parser: angelibrary, fetchHtml: fetchHtmlBig5 };
   if (hostname.endsWith('bxg123.cc')) return { parser: bxg123, fetchHtml: fetchHtmlGb2312 };
+  if (hostname.endsWith('52shuku.net')) return { parser: shuku52, fetchHtml };
   throw new Error('不支援的小說來源網站');
 }
 
