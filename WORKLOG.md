@@ -1,5 +1,16 @@
 # 工作日誌 (Worklog)
 
+## 2026-07-22（下半場）
+- 使用者回報：全知讀者視角（xbanxia.cc）本機正常，Render雲端手機端章節目錄載入失敗HTTP403
+- 依debug原則，先確認情境（Render雲端版 vs 本機區網）、列出可能原因（IP信譽封鎖/共享IP池已被拉黑/header差異/暫時性巧合）不預設是程式問題，經使用者確認後加暫時性debug log（記錄fetchHtml非200時的status/headers/body片段）推送
+- 使用者回報Render Logs：確認`server: cloudflare`、`cf-mitigated: challenge`、body為`Just a moment...`，與czbooks.net同類型IP信譽阻擋，改用curl大概率無效
+- 提出三選項（雲端版移除此來源／加headless瀏覽器／付費residential proxy／先不處理待下次），使用者選擇「自行修改target.json換一個新來源（52書庫 www.52shuku.net），請建立對應parser」
+- 查證52shuku.net結構：書籍介紹頁本身即完整章節目錄（`ul.list.clearfix li.mulu a`，1310筆單頁列完）；章節內文頁以頁碼命名非章節（如`h74i_2.html`=第1章），UTF-8編碼，Cloudflare僅作CDN快取非阻擋；每頁內文夾帶站方推廣文字需濾除；首章「上一頁」連結指回書籍介紹頁（非真章節，需判斷過濾）、末章無「下一頁」連結（乾淨邊界，非自我循環bug）
+- 與使用者確認兩點後動工：章節標題由站方原始「第N頁」改標為「第N章」與其他來源一致；xbanxia.cc既已替換，同步刪除`parsers/xbanxia.js`與dispatch
+- 建立`parsers/52shuku.js`，對照實際抓取的頁面（第1章/第499章/第1310章）做單元測試，章節數、標題格式、上下頁邊界判斷、推廣文字濾除皆正確；移除已診斷完成的暫時性debug log
+- 使用者於瀏覽器完成端對端測試確認52書庫來源正常，結束本階段工作
+- 使用者交代下次工作項目：**簡體來源轉換繁體顯示**（目前52書庫等簡體來源直接顯示簡體字，需討論轉換方案）
+
 ## 2026-07-22
 - 需求：將 target.txt 轉換為 JSON 格式，並解析 target 檔內新增的小說來源後補齊對應 parser
 - 確認轉換範圍：與使用者確認「target.json 取代 target.txt 作為唯一資料來源」（非僅備份快照），`targetParser.js` 改為讀取 `target.json` 並用 JSON.parse 取代原本的文字區塊解析；轉換後 `target.txt` 依使用者指示直接刪除（git 有紀錄可復原）

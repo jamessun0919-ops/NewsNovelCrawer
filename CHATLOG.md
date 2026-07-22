@@ -1,5 +1,41 @@
 # 對話紀錄 (Chatlog)
 
+## 2026-07-22（下半場）
+
+### 開場：讀取交接資料、開啟本機測試網頁
+- 開發者：請閱讀工作規則與交接文檔後與我討論，開啟本地測試網頁
+- Agent 讀取 HANDOVER.md 與近兩日 WORKLOG.md，發現 target.json 與交接文件記載不符：czbooks.net（絕頂唐門）整筆消失、新增5本黃金屋(tw.hjwzw.com)書籍
+- Agent 提問（AskUserQuestion）czbooks.net消失是否為刻意移除 → 開發者確認「是，刻意移除」
+- Agent 啟動本機server（`npm start` background），確認運行於 http://localhost:3000
+
+### xbanxia.cc 手機端403排查
+- 開發者：全知讀者視角（半夏小說）於本地端可以閱讀，於手機端出現HTTP403章節目錄載入失敗
+- Agent 指出錯誤訊息格式`章節目錄抓取失敗：HTTP 403`代表是伺服器端（非瀏覽器）向xbanxia.cc發request被拒絕，提問（AskUserQuestion）手機端是連Render雲端版還是本機區網IP → 開發者確認「Render雲端版」
+- Agent 依debug原則列出四個可能原因（IP信譽封鎖同czbooks.net類型／Render共享IP池已被拉黑／header差異被放大／暫時性巧合）不預設是程式碼問題，詢問要往哪個方向查
+- 開發者：像之前czbooks.net的做法一樣，先加暫時性debug log部署上去
+- Agent 查git歷史找出czbooks.net當時debug log的寫法慣例，發現現有`fetchHtml`在非200時直接throw、沒讀取response body，改寫成先讀status/headers/body片段再log再throw，說明CLAUDE.md規範外的CLAUDE.md也有記錄（用戶根目錄與專案根目錄兩份CLAUDE.md皆載入），確認後commit並推送
+- 開發者提供Render Logs：`server: cloudflare`、`cf-mitigated: challenge`、body為`Just a moment...`人機驗證頁 — Agent確認與czbooks.net同類型IP信譽阻擋，並提醒改用curl繞過大概率無效（czbooks.net案例curl在雲端上對IP信譽阻擋一樣無效）
+- Agent 提問（AskUserQuestion）處理方向：雲端版不提供此來源(同czbooks處理) / 加headless瀏覽器 / 付費residential proxy / 先不處理留待下次 → 開發者選擇「我修改JSON檔，提供新的網站來源，請進行解析」（52書庫 www.52shuku.net 取代 xbanxia.cc）
+
+### 建立52書庫(52shuku.net) parser
+- Agent 用curl查證52shuku.net實際結構：
+  - 書籍介紹頁（`h74i.html`）本身即完整章節目錄，`ul.list.clearfix li.mulu a`選擇器可取得1310筆連結，單頁列完
+  - 章節內文頁以「頁碼」命名而非「章節」（如`h74i_2.html`對應站方標籤「第1頁」），UTF-8編碼，Cloudflare只當CDN快取（`cf-cache-status: HIT`），非阻擋機制
+  - 每頁內文結尾夾帶「哦豁，小夥伴們如果覺得52書庫不錯...」推廣文字需濾除；首章「上一頁」連結指回書籍介紹頁（非真章節，需判斷過濾為null）；末章（第1310章）沒有「下一頁」連結，乾淨邊界，非自我循環bug
+  - 用node直接測試cheerio對malformed HTML（內文最後一段`<p>`未閉合就接`<div>`）的解析行為，確認htmlparser2會自動正確斷開，不需額外處理
+- Agent 提問（AskUserQuestion）兩點：
+  - 章節標題命名：直接用站方原始「第N頁」/ 改標「第N章」與其他來源一致 → 開發者選擇「改標為第N章與其他來源一致」
+  - xbanxia.js與dispatch是否同步刪除（比照先前linovelib→bxg123的做法）→ 開發者選擇「是，刪除xbanxia.js與dispatch」
+- Agent 建立`parsers/52shuku.js`（含標題重新標記邏輯、推廣文字濾除、首章prevUrl邊界判斷），更新`server.js`的`getNovelSite()`加入52shuku.net分支、移除xbanxia require與dispatch、移除已診斷完成的debug log，刪除`parsers/xbanxia.js`
+- Agent 重啟本機server載入新程式碼，用實際抓取的頁面（第1章`h74i_2.html`、第499章`h74i_500.html`、第1310章/末章`h74i_1311.html`）寫測試腳本驗證parser：章節數1310、標題格式「第N章」、上下頁邊界判斷（首章prevUrl為null、末章nextUrl為null）、推廣文字與空段落濾除，皆符合預期
+- Agent grep確認程式碼內無殘留xbanxia引用（僅文件保留歷史紀錄）
+
+### 推送與收尾
+- 開發者：先推送我才能以手機測試；並要求調整工作流程：後續解析新網站來源時，先檢查是否有影響手機使用的反爬機制（如Cloudflare、自訂協議），有的話先回報開發者決定，不要直接寫程式，避免重複工作
+- Agent commit並推送52shuku.js parser與相關變更（不含CLAUDE.md的無關修改），並將此工作流程規則存入記憶（feedback_check_anti_scraping_before_parser.md）
+- 開發者：５２書庫來源測試完成，結束本階段工作；記錄下次工作項目：簡體來源轉換繁體顯示
+- Agent 關閉本機測試server，更新HANDOVER.md/WORKLOG.md/CHATLOG.md後推送
+
 ## 2026-07-22
 
 ### 開場：確認需求

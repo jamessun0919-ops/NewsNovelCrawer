@@ -34,9 +34,14 @@
   - 曾嘗試新增 `tw.linovelib.com`（嗶哩輕小說，我獨自升級）：查證後發現單一章節會被拆成多個實體分頁（如`xxx.html`/`xxx_2.html`），與現有「一個parser呼叫對應一個HTML頁面」架構衝突；與使用者確認後選擇「只抓第一頁、不做跨分頁拼接、不加下一頁按鈕」的簡化方案並完成過；**之後使用者將此來源改為筆仙閣，此 parser 與 dispatch 已依使用者指示刪除**，如未來想換回或重新評估，設計決策記錄在 CHATLOG 2026-07-22
 - **新增筆仙閣（bxg123.cc）parser 取代嗶哩輕小說**：**第二個非UTF-8來源**，GB2312編碼；591節全部列在單一目錄頁無分頁，無反爬蟲防護；最後一節的「下一節」連結會指回自己（網站bug，非我方問題），parser 已判斷過濾避免卡在原地；**此網域的 HTTPS 連線在 TLS 交握階段會被重置**（http完全正常，判斷是網路層級的SNI過濾而非網站自身機制，不確定是否為特定網路環境限定），因此 target.json 該筆來源網址直接用 `http://`，程式端未做協定轉換的特殊處理，如果部署後發現連不上，優先檢查是不是雲端環境的網路路徑對這個網域的 https 反而是通的（跟本機情況相反）
 - 三支新 parser（xbanxia、angelibrary、bxg123）皆已對正式網站直接測試過章節列表筆數、內文清洗、上下章連結（含邊界情況），使用者也已自行在瀏覽器完成端對端測試確認正常
+- **czbooks.net（絕頂唐門）已從 target.json 移除**，使用者確認為刻意移除（非誤刪），目前雲端版不提供此來源
+- **xbanxia.cc（半夏小說，全知讀者視角）在 Render 雲端上被 Cloudflare 擋下**：本機測試時無防護，但手機連 Render 雲端版時章節目錄回 HTTP 403；加暫時性debug log部署後從Render Logs確認回應含`server: cloudflare`、`cf-mitigated: challenge`，body為`Just a moment...`人機驗證頁——與czbooks.net同類型的IP信譽層級阻擋（機房IP被判定高風險），非curl可繞過的TLS指紋辨識問題，也不是程式邏輯錯誤；debug log診斷完成後已移除
+- **`全知讀者視角` 來源改為 52書庫（www.52shuku.net）取代 xbanxia.cc**，`parsers/xbanxia.js` 與其 dispatch 已同步刪除（不再使用，比照先前 linovelib→bxg123 的處理方式）
+- **新增 `parsers/52shuku.js`**：此站結構與其他來源不同——書籍介紹頁（`h74i.html`）本身就是完整章節目錄（`ul.list.clearfix li.mulu a`，1310筆單頁列完，無分頁）；章節內文頁以「頁碼」命名而非「章節」（如`h74i_2.html`站方標籤是「第1頁」），已在parser內重新標記為「第N章」與其他小說來源一致（依使用者要求，非站方原始命名）；UTF-8編碼；Cloudflare在此站只當CDN快取用（`cf-cache-status: HIT`），非阻擋機制；每頁內文結尾夾帶站方推廣文字（含「52书库」字樣）需濾除；首章「上一頁」連結指回書籍介紹頁（非真章節，parser判斷href是否符合`_N.html`章節頁格式來過濾，非真章節則prevUrl設為null）；末章（第1310章）沒有「下一頁」連結，乾淨邊界，非自我循環bug；已用實際抓取的頁面（第1章/第499章/末章）做過parser單元測試，章節數、標題格式、上下頁邊界判斷、推廣文字濾除皆正確
+- **開發者要求調整工作流程**：後續解析新的小說（或新聞）來源時，第一步先用curl檢查該站對雲端/機房IP是否有防護（Cloudflare回應headers如`server: cloudflare`/`cf-mitigated`、驗證頁body等），如發現有風險，先回報開發者決定是否繼續，再開始寫parser程式碼——避免像czbooks.net、xbanxia.cc那樣先寫完parser、部署後才發現雲端不可用而白工；此規則已存入記憶（feedback_check_anti_scraping_before_parser.md）
 
 ## 目前的瓶頸或停頓點 (Current Blocker/Status)
-本輪工作（target.json 轉換＋新增小說來源）已完成並推送，無已知阻塞。PWA 圖示驗證（上一輪遺留事項）仍待使用者回報。
+本輪工作（xbanxia.cc雲端403診斷＋改用52書庫來源）已完成並推送，無已知阻塞。PWA 圖示驗證（前次遺留事項）仍待使用者回報。
 
 czbooks.net 在 Render 上的 Cloudflare 阻擋問題，使用者已表態暫不處理（target.txt 已加註），非目前待辦，但解法選項還是先記錄著，之後有需要可以直接接續：
 - A. 在 Render 上加 headless 瀏覽器（如 Puppeteer）自動解 JS 驗證頁——免費但變慢、吃記憶體，免費方案 512MB 可能不夠、得升級付費方案
@@ -44,10 +49,11 @@ czbooks.net 在 Render 上的 Cloudflare 阻擋問題，使用者已表態暫不
 - C. 雲端版只提供新聞 + hjwzw.com 小說，czbooks.net 只在本機用——不用額外花錢，但雲端版看不到 czbooks.net 這個來源
 
 ## 下一步行動 (Next Steps)
-1. 下次開始工作時，先檢查 target.json 是否有新增項目（新的類型/自訂標題/網址）；如有，先與使用者確認是否要建立對應的新 parser，再動工
-2. 確認使用者是否已驗證修正後的 PWA 圖示（手機上重新「加入主畫面」，記得提醒使用者要先移除舊的主畫面捷徑，否則舊圖示會被快取）
-3. 使用者已表示 PWA 下一步可能想加離線閱讀或其他功能，但目前只確認要「加入主畫面」這一項，其餘功能待使用者明確提出後再討論架構（離線快取會牽涉到 Service Worker 如何處理已登入內容的快取邊界，需要先討論清楚再動工，見 CHATLOG）
-4. 本專案後續工作一律推送至 https://github.com/jamessun0919-ops/NewsNovelCrawer
+1. **本次確認的下一項工作：簡體來源轉繁體顯示**——目前 52書庫（52shuku.net）、bxg123.cc（GB2312原始編碼但已知是簡體內容）等來源直接顯示簡體字，尚未討論轉換方案（例如用 opencc 之類的簡繁轉換套件、在 parser 端轉還是前端轉、是否所有簡體來源都要轉或僅新增來源），下次開工先跟使用者確認方案架構再動工，勿自行預設
+2. 下次開始工作時，先檢查 target.json 是否有新增項目（新的類型/自訂標題/網址）；如有，先與使用者確認是否要建立對應的新 parser，再動工；**新增小說來源前，第一步先用curl檢查該站對雲端/機房IP是否有防護（Cloudflare等），有風險先回報決定再寫程式**（見上方關鍵設定）
+3. 確認使用者是否已驗證修正後的 PWA 圖示（手機上重新「加入主畫面」，記得提醒使用者要先移除舊的主畫面捷徑，否則舊圖示會被快取）
+4. 使用者已表示 PWA 下一步可能想加離線閱讀或其他功能，但目前只確認要「加入主畫面」這一項，其餘功能待使用者明確提出後再討論架構（離線快取會牽涉到 Service Worker 如何處理已登入內容的快取邊界，需要先討論清楚再動工，見 CHATLOG）
+5. 本專案後續工作一律推送至 https://github.com/jamessun0919-ops/NewsNovelCrawer
 
 ## 關鍵設定與上下文 (Key Context & Rules)
 - **技術棧**：Node.js + Express + Cheerio（後端）＋ 純 HTML/JS 前端（不用框架）
@@ -69,14 +75,16 @@ czbooks.net 在 Render 上的 Cloudflare 阻擋問題，使用者已表態暫不
   - 登出：首頁右上角「登出」連結（`public/index.html`），呼叫 `POST /api/logout` 銷毀 session 後導回登入頁；其餘頁面目前未放登出按鈕（可從首頁返回登出，未來如需要可再加到每頁 header）
   - 已實測 Render 免費方案的容器環境有內建系統 curl（`fetchHtmlViaCurl` 在 Render 上執行不會噴 command not found），czbooks.net 抓不到內容是 Cloudflare IP 信譽阻擋，不是 curl 缺失問題（詳見上方「目前的瓶頸」）
 - **多來源小說 parser 派發機制**：`server.js` 的 `getNovelSite(url)` 依網址 hostname 決定要用哪個 parser 與哪種 fetch 方式，novel 相關的兩支 API 路由都透過這個函式取得對應 parser，不再寫死；新增小說來源時要在這裡加一個 hostname 判斷分支。目前對應表：
-  - czbooks.net → `czbooks.js` + `fetchHtmlViaCurl`（繞Cloudflare TLS指紋辨識）
+  - czbooks.net → `czbooks.js` + `fetchHtmlViaCurl`（繞Cloudflare TLS指紋辨識；**此來源已從target.json移除**，使用者確認暫不提供，parser檔案保留未刪）
   - hjwzw.com → `hjwzw.js` + 一般 `fetchHtml`（無防護）
-  - xbanxia.cc → `xbanxia.js` + 一般 `fetchHtml`（無防護）
   - angelibrary.com → `angelibrary.js` + `fetchHtmlBig5`（無防護，但Big5編碼需解碼）
   - bxg123.cc → `bxg123.js` + `fetchHtmlGb2312`（無防護，但GB2312編碼需解碼；**target.json裡這筆來源網址須用`http://`**，https在此網域會在TLS交握階段被重置）
+  - 52shuku.net → `52shuku.js` + 一般 `fetchHtml`（Cloudflare只當CDN快取，非阻擋機制；取代已被Render雲端擋下的xbanxia.cc）
+  - ~~xbanxia.cc~~ → 已刪除（`parsers/xbanxia.js`與dispatch皆移除），在Render上被Cloudflare以IP信譽判定擋下（回傳`Just a moment...`驗證頁），改用52shuku.net取代
   - novel/chapter 兩支 API 路由呼叫 parser 時會多傳一個 `url` 參數（`parser.parseChapterList(html, url)`／`parser.parseChapter(html, url)`），供需要用來源網址解析相對連結的 parser 使用（目前只有 angelibrary.js、bxg123.js 用到，其餘 parser 可忽略此參數）
 - **`parsers/hjwzw.js` 清洗規則**：章節列表用 `#tbchapterlist a` 選取；章節內文的容器是 `div[style*="text-indent: 2em"]`，但頁面下方另有一個內容相同 inline style 的短 div（「請記住本站域名」廣告字樣），要取 `.first()` 才是真正內文；內文開頭還有兩段站方樣板文字混在正文容器內（一段是純文字＋`<b>`標籤的域名提醒、不包在`<p>`裡；一段是包在第一個`<p>`裡的書名+章節標題重複），需要各自移除，見程式內註解；「上一章」連結在第一章時會指向章節ID為`,0`的死連結（需判斷過濾掉，回傳null），「下一章」連結在最後一章直接不存在`<a>`標籤（純文字「末頁」）
-- **`parsers/xbanxia.js` 清洗規則**：章節列表用 `div.book-list ul li a`；內文容器 `#nr1` 開頭有一個空的佔位 `div[style*="height: 0"]`要移除、開頭還有重複標題的純文字節點+`<br>`要移除，結尾有站方標語「半夏小說，快樂很多」的`<span>`要移除；上一章/下一章用 `li.prev a[rel="prev"]` / `li.next a[rel="next"]`，href可能帶前後空白需trim
+- **`parsers/52shuku.js` 清洗規則**：UTF-8編碼，一般`fetchHtml`即可；書籍介紹頁（如`h74i.html`）本身就是完整章節目錄，選擇器`ul.list.clearfix li.mulu a`；章節內文頁以「頁碼」命名（如`h74i_2.html`），站方標題標籤是「第N頁」非「第N章」，parser從`<title>`裡的`(N)`數字換算成`第(N-1)章`重新標記（頁2=第1章，因為頁1是書籍介紹頁不是章節）；內文容器`article.article-content`裡的`<p>`段落，過濾掉含「52书库」字樣的站方推廣段落（固定出現在每頁最後）；「上一頁」連結在第一章會指回書籍介紹頁（href不符合`_數字.html`章節頁格式），需判斷過濾回傳null；最後一章（第1310章）沒有「下一頁」`<a>`標籤，天然邊界不需特殊處理
+- **已刪除的 `parsers/xbanxia.js`（原半夏小說parser，已不使用）**：原本無防護可直接fetch，但後來發現在Render雲端上被Cloudflare以IP信譽判定擋下（`server: cloudflare`、`cf-mitigated: challenge`，回傳`Just a moment...`驗證頁），與czbooks.net同類型問題；使用者將「全知讀者視角」來源改為52書庫(52shuku.net)取代，此parser與dispatch已刪除，原清洗規則（章節列表`div.book-list ul li a`、內文容器`#nr1`需移除開頭佔位div與重複標題、結尾站方標語span、上一章/下一章用`li.prev a[rel="prev"]`/`li.next a[rel="next"]`）記錄於git歷史，如未來想重新評估可查
 - **`parsers/angelibrary.js` 清洗規則**：這是 Big5 編碼站，`server.js` 的 `fetchHtmlBig5` 用 `iconv-lite` 解碼；章節目錄選擇器**必須**用 `table[border="1"][cellspacing="0"]`（多加`cellspacing="0"`排除頁面最外層同樣有`border="1"`的包裝表格，否則章節數會翻倍算重）；內文在 `<pre>` 純文字區塊（無`<p>`/`<br>`標籤），parser 用正則`【(.+?)】`找標題行、`踴躍購買`字樣找內文結尾，逐行手動escape後用`<br>`拼接；此站沒有「上一章」連結，`prevUrl`固定回傳null；「下一章」連結在每卷最後一章是網站自己的死連結（指向不存在的頁面），parser照樣回傳，觸發時走現有錯誤處理機制即可，非bug
 - **`parsers/bxg123.js` 清洗規則**：GB2312編碼站，`server.js`的`fetchHtmlGb2312`用`iconv-lite`解碼；章節目錄`div.catalog ul li a`（整本591節單頁列完，無分頁）；內文`h1`是標題、`#mycontent`是內文（第1節會夾帶作品簡介文字，是網站原有排版非廣告，不需濾除）；上一節/下一節連結文字比對`上一节`/`下一节`；最後一節的「下一節」連結會指回自己（網站bug），parser比對`nextUrl === sourceUrl`後回傳null過濾掉，避免閱讀卡在原地
 - **曾評估但已放棄的小說來源**：`tw.linovelib.com`（嗶哩輕小說）——單一章節被拆成多個實體分頁，與現有「一個parser呼叫對應一頁HTML」架構衝突，且目錄有VIP付費章節的假連結需濾除；使用者後來把「我獨自升級」這本書的來源改為筆仙閣，此站的 parser 與 dispatch 已刪除，如未來想重新評估或恢復，技術細節記錄在 CHATLOG 2026-07-22
