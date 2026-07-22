@@ -1,5 +1,17 @@
 # 工作日誌 (Worklog)
 
+## 2026-07-22
+- 需求：將 target.txt 轉換為 JSON 格式，並解析 target 檔內新增的小說來源後補齊對應 parser
+- 確認轉換範圍：與使用者確認「target.json 取代 target.txt 作為唯一資料來源」（非僅備份快照），`targetParser.js` 改為讀取 `target.json` 並用 JSON.parse 取代原本的文字區塊解析；轉換後 `target.txt` 依使用者指示直接刪除（git 有紀錄可復原）
+- target.txt 比對交接文件，發現新增 3 個小說來源（半夏小說 xbanxia.cc、熾天使書城 angelibrary.com、嗶哩輕小說 tw.linovelib.com），依專案規則先與使用者確認要建立對應 parser 才動工
+- 逐一查證三站實際結構後建立 parser：
+  - `xbanxia.cc`：無反爬蟲防護，內文需濾除站方尾綴廣告文字與重複標題
+  - `angelibrary.com`：首次遇到 Big5 編碼來源（其餘皆UTF-8），新增 `iconv-lite` 套件解碼；章節目錄無分頁但章節標籤重複（每卷都是「第一章~第二十章」），需組合卷名+章名才有意義；網站本身沒有「上一章」連結，且每卷最後一章的「下一章」連結是網站自己的死連結（非我方問題，出錯時走現有錯誤處理機制）
+  - `tw.linovelib.com`：查證後發現單一章節會被拆成多個實體分頁（如 xxx.html / xxx_2.html / xxx_3.html），與現有架構「一個parser呼叫對應一個HTML頁面」衝突；與使用者確認後決定只抓第一頁、不做跨分頁拼接，也不加下一頁按鈕
+- 使用者實測期間將「我獨自升級」來源改為筆仙閣（bxg123.cc），改查證此站：GB2312編碼（第二個非UTF-8來源）、591節全部列在單一目錄頁無分頁、無反爬蟲驗證，但發現此網域的 **HTTPS 連線在TLS交握階段會被重置**（http完全正常，判斷是網路層級的SNI過濾而非網站自身機制），與使用者確認後 target.json 該筆來源改用 `http://`，程式端不做協定轉換的特殊處理；同時使用者決定移除已無來源指向的 `parsers/linovelib.js` 與對應 dispatch
+- 三支新 parser（xbanxia、angelibrary、bxg123）皆已對正式網站做過章節列表筆數、內文清洗、上下章連結（含邊界情況：angelibrary每卷最後一章死連結、bxg123最後一節自我循環連結）的直接測試，皆正確
+- 使用者自行於瀏覽器完成本機端對端測試，確認功能正常後關閉本機測試用 server，推送至 GitHub
+
 ## 2026-07-21
 - 背景：使用者無法提供穩定開機的 server，需部署到雲端才能用手機等裝置存取，因此決定先做帳號密碼機制再考慮部署
 - 動工前先確認方案架構：討論部署平台類型對架構的影響（czbooks.net 依賴系統 curl 子行程繞過 Cloudflare、內文快取存在記憶體中，這兩點在 serverless 平台可能失效），使用者確認方向為「常駐型服務」(Render/Railway/Fly.io)，帳號規模確認為「單一帳號」

@@ -6,10 +6,14 @@ const { promisify } = require('util');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
+const iconv = require('iconv-lite');
 const { loadTargets } = require('./targetParser');
 const technews = require('./parsers/technews');
 const czbooks = require('./parsers/czbooks');
 const hjwzw = require('./parsers/hjwzw');
+const xbanxia = require('./parsers/xbanxia');
+const angelibrary = require('./parsers/angelibrary');
+const bxg123 = require('./parsers/bxg123');
 
 const execFileAsync = promisify(execFile);
 
@@ -38,12 +42,32 @@ async function fetchHtmlViaCurl(url) {
   return stdout;
 }
 
+// angelibrary.com serves Big5-encoded pages with no charset in the
+// Content-Type header, so Node's fetch can't auto-detect it and would garble
+// the text; decode the raw bytes as Big5 explicitly instead.
+async function fetchHtmlBig5(url) {
+  const res = await fetch(url, { headers: { 'User-Agent': UA } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  return iconv.decode(buf, 'big5');
+}
+
+async function fetchHtmlGb2312(url) {
+  const res = await fetch(url, { headers: { 'User-Agent': UA } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  return iconv.decode(buf, 'gb2312');
+}
+
 // Per-site adapter lookup for novel sources: each site has its own HTML
 // structure and its own bot-detection quirks (see fetchHtmlViaCurl above).
 function getNovelSite(url) {
   const hostname = new URL(url).hostname;
   if (hostname.endsWith('czbooks.net')) return { parser: czbooks, fetchHtml: fetchHtmlViaCurl };
   if (hostname.endsWith('hjwzw.com')) return { parser: hjwzw, fetchHtml };
+  if (hostname.endsWith('xbanxia.cc')) return { parser: xbanxia, fetchHtml };
+  if (hostname.endsWith('angelibrary.com')) return { parser: angelibrary, fetchHtml: fetchHtmlBig5 };
+  if (hostname.endsWith('bxg123.cc')) return { parser: bxg123, fetchHtml: fetchHtmlGb2312 };
   throw new Error('不支援的小說來源網站');
 }
 
@@ -163,7 +187,7 @@ app.get('/api/novel/chapters', async (req, res) => {
     if (!chapters) {
       const { parser, fetchHtml: fetchHtmlForSite } = getNovelSite(url);
       const html = await fetchHtmlForSite(url);
-      chapters = parser.parseChapterList(html);
+      chapters = parser.parseChapterList(html, url);
       chapterListCache.set(url, chapters);
     }
     const totalChapters = chapters.length;
@@ -186,7 +210,7 @@ app.get('/api/novel/chapter', async (req, res) => {
     if (articleCache.has(url)) return res.json(articleCache.get(url));
     const { parser, fetchHtml: fetchHtmlForSite } = getNovelSite(url);
     const html = await fetchHtmlForSite(url);
-    const chapter = parser.parseChapter(html);
+    const chapter = parser.parseChapter(html, url);
     articleCache.set(url, chapter);
     res.json(chapter);
   } catch (err) {

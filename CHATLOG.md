@@ -1,5 +1,41 @@
 # 對話紀錄 (Chatlog)
 
+## 2026-07-22
+
+### 開場：確認需求
+- 開發者：今天的工作內容，轉換target.txt為JSON檔；解析target檔內新增的網站格式後加入新增的小說
+- Agent 讀取 HANDOVER.md 與近兩日 WORKLOG.md、target.txt、targetParser.js、server.js，發現 target.txt 比交接文件多了 3 個小說來源（半夏小說、熾天使書城、嗶哩輕小說），皆無對應 parser
+- Agent 提問（AskUserQuestion）：
+  - JSON轉換目的：取代target.txt改用JSON當資料來源 / 只是想要JSON格式快照備份 / 其他 → 開發者選擇「取代，target.txt停用」
+  - 新增3個來源要不要建parser：3個都要先逐一查證 / 先做一部分 / 都不建 → 開發者選擇「3個都要，先逐一查證網站結構」
+- Agent 完成 target.json 轉換與 targetParser.js 改寫，node直接require驗證讀取正確
+
+### 三個新網站查證與討論
+- Agent 用 WebFetch + curl + Node fetch 逐一查證 xbanxia.cc、angelibrary.com、tw.linovelib.com 三站結構，回報：
+  - xbanxia.cc 無防護，可直接建parser
+  - angelibrary.com 是Big5編碼（首次非UTF-8來源），需新增iconv-lite；章節目錄無「上一章」連結且每卷最後一章「下一章」連結是網站自己的死連結
+  - tw.linovelib.com 單一章節被拆成多實體分頁，與現有parser架構（一次呼叫對應一頁HTML）衝突，需要開發者決定處理方式
+- Agent 提問（AskUserQuestion）：
+  - linovelib分頁策略：伺服器端自動拼接所有分頁（需改parser簽名為async，推薦） / 只顯示第一頁不加下一頁按鈕 / 放棄此來源 → 開發者選擇「只顯示第一頁，不加下一頁按鈕」
+  - target.txt處置：直接刪除(git有紀錄可復原) / 保留但不使用 → 開發者選擇「直接刪除」
+- Agent 建立 xbanxia.js、angelibrary.js、linovelib.js 三支parser，新增iconv-lite套件，改server.js的getNovelSite()派發機制與novel路由（都改成傳入url給parser做相對連結解析），刪除target.txt
+- Agent 對三站做直接單元測試（章節列表筆數、內文、上下章連結），過程中發現並修正兩個bug：
+  - angelibrary.js 的 `table[border="1"]` 選擇器誤抓到外層包裝表格，導致章節數翻倍（404→808），改用`table[border="1"][cellspacing="0"]`排除外層表格後修正
+  - linovelib.js 未過濾VIP付費章節的`javascript:cid(1)`假連結，導致產生無效URL，加上過濾後修正
+- Agent 詢問是否要走一次真實HTTP server端對端測試（需要帳號密碼）→ 開發者選擇「不用了，我自己開瀏覽器測試」
+
+### 我獨自升級來源改為筆仙閣
+- 開發者（透過IDE直接編輯target.json）：我獨自升級的來源改為另一網站筆仙閣，解析該網站後跟我討論
+- Agent 查證 bxg123.cc，發現：GB2312編碼（第二個非UTF-8來源）、591節全部在單一目錄頁無分頁、無反爬蟲防護，但發現該網域**HTTPS連線在TLS交握階段會被重置**（http完全正常），研判是網路層級的SNI過濾而非網站自身反爬機制
+- Agent 提問（AskUserQuestion）：
+  - target.json網址要不要改http：改成http推薦(程式不用做協定轉換) / 保留https程式端強制轉http → 開發者選擇「改成http」
+  - 已無來源指向的linovelib.js與dispatch要怎麼處理：保留不動 / 現在就刪除 → 開發者選擇「現在就刪除」
+- Agent 建立bxg123.js（含最後一節自我循環死連結的過濾邏輯），更新target.json網址為http、server.js新增fetchHtmlGb2312、刪除linovelib.js與相關dispatch，直接測試591節章節列表、內文、上下章連結（含邊界情況）皆正確
+
+### 收尾
+- 開發者：關閉現有server再重開一次 → Agent找到PID並關閉，重新啟動確認正常運行
+- 開發者：本地測試完畢，請推送至倉庫 → Agent關閉本機測試server、更新HANDOVER.md/WORKLOG.md/CHATLOG.md後推送至 https://github.com/jamessun0919-ops/NewsNovelCrawer
+
 ## 2026-07-21
 
 ### 開場：確認交接狀態
