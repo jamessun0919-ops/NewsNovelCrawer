@@ -27,7 +27,13 @@ const chapterListCache = new Map(); // novelUrl -> [{ title, url }]
 
 async function fetchHtml(url) {
   const res = await fetch(url, { headers: { 'User-Agent': UA } });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text();
+    console.log(`[debug] fetchHtml non-ok status=${res.status} url=${url}`);
+    console.log(`[debug] fetchHtml response headers: ${JSON.stringify([...res.headers.entries()])}`);
+    console.log(`[debug] fetchHtml body snippet: ${body.slice(0, 300)}`);
+    throw new Error(`HTTP ${res.status}`);
+  }
   return res.text();
 }
 
